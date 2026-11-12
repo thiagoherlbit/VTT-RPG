@@ -1,259 +1,190 @@
 (function () {
-  'use strict';
-
   let KEY = sessionStorage.getItem('fk') || '';
   let ME = null;
   let DATA = [];
-  let cid = '';
-  let view = 'sheet'; // 'sheet' | 'admin'
+  let selectedPlayerId = '';
+  let currentView = 'sheet';
+  let saveTimer = null;
+  let hasPendingChanges = false;
 
-  const V0 = n => ({ n, c: 0, m: 0 });
-  const D = {
-    name: '',
-    title: '',
-    motto: '',
-    notes: '',
-    mnotes: '',
-    lock: false,
-    attrs: [['Força', 0], ['Destreza', 0], ['Constituição', 0], ['Inteligência', 0], ['Presença', 0]],
-    hp: { n: 'Vida', c: 0, m: 0, x: 0 },
-    st: V0('Stamina'),
-    avatar: '',
-    banner: '',
-    bg: '',
-    skills: [],
-    items: []
-  };
+  const ATTRS = [
+    { key: 'FOR', name: 'Força' },
+    { key: 'DES', name: 'Destreza' },
+    { key: 'CON', name: 'Constituição' },
+    { key: 'INT', name: 'Inteligência' },
+    { key: 'SAB', name: 'Sabedoria' },
+    { key: 'CAR', name: 'Carisma' }
+  ];
 
-  const TY = {
-    Arma: '#d1303c',
-    'Relíquia': '#d8b45a',
-    'Consumível': '#4fa36b',
-    'Munição': '#6f8fb8',
-    Outro: '#8a7f7c'
-  };
-  const TN = Object.keys(TY);
-
-  function I(p, c) {
-    return '<svg class="ic' + (c ? ' ' + c : '') + '" viewBox="0 0 24 24" aria-hidden="true">' + p + '</svg>';
-  }
-
-  const P = {
-    cross: '<path d="M12 2v20M5 8h14"/>',
-    drop: '<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/>',
-    dag: '<path d="M12 2l3 11-3 3-3-3z"/><path d="M7 16h10M12 16v6"/>',
-    bul: '<path d="M9 21V10c0-4 1.5-6 3-7 1.5 1 3 3 3 7v11zM9 17h6"/>',
-    dia: '<path d="M12 3l8 9-8 9-4-4.5L4 12z"/>',
-    skull: '<path d="M12 3a8 8 0 0 0-8 8c0 3 1.5 4.5 3 5.5V20h10v-3.5c1.5-1 3-2.5 3-5.5a8 8 0 0 0-8-8z"/><circle cx="9" cy="11" r="1.8"/><circle cx="15" cy="11" r="1.8"/><path d="M12 14v2M10 20v-2M14 20v-2"/>',
-    heart: '<path d="M12 21s-8-5.5-8-11a4.5 4.5 0 0 1 8-2.5A4.5 4.5 0 0 1 20 10c0 5.5-8 11-8 11z"/>',
-    flame: '<path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4-1-6 1-10z"/>',
-    sig: '<circle cx="12" cy="12" r="9.5"/><path d="M12 3l5.3 16.3L3.4 9.2h17.2L6.7 19.3z"/>'
-  };
-
-  const TIC = { Arma: 'dag', 'Relíquia': 'cross', 'Consumível': 'drop', 'Munição': 'bul', Outro: 'dia' };
-  const VI = {
-    hp: [I(P.heart, 'ht'), 'Vida', ['Dano', 'Curar']],
-    st: [I(P.flame, 'fm'), 'Stamina', ['Gastar', 'Recuperar']]
-  };
-
-  function mod(v) {
-    v = +v || 0;
-    if (v <= 1) return v - 6;
-    if (v === 2) return -4;
-    if (v === 3) return -3;
-    if (v <= 5) return -2;
-    if (v <= 8) return -1;
-    if (v <= 12) return 0;
-    if (v <= 15) return 1;
-    if (v <= 17) return 2;
-    return v - 15;
-  }
-
-  function sg(n) {
-    return (n > 0 ? '+' : '') + n;
-  }
-
-  function modH(i, v) {
-    const m = mod(v);
-    return '<small class="mod ' + (m > 0 ? 'pos' : m < 0 ? 'neg' : '') + '" data-mod="' + i + '" title="Vantagem ou desvantagem do atributo">' + sg(m) + '</small>';
-  }
-
-  function cl(o) {
-    return JSON.parse(JSON.stringify(o));
-  }
-
-  function normalizeSheet(raw, fallbackName) {
-    const base = cl(D);
-    if (!raw || typeof raw !== 'object') {
-      base.name = fallbackName || '';
-      return base;
-    }
-    const merged = Object.assign(base, raw);
-    merged.hp = Object.assign(cl(D.hp), raw.hp || {});
-    merged.st = Object.assign(V0('Stamina'), raw.st || {});
-    merged.attrs = Array.isArray(raw.attrs) ? raw.attrs : cl(D.attrs);
-    merged.skills = Array.isArray(raw.skills) ? raw.skills : [];
-    merged.items = Array.isArray(raw.items) ? raw.items : [];
-    if (!merged.name && fallbackName) merged.name = fallbackName;
-    return merged;
-  }
-
-  let S = cl(D);
-  let oi = -1;
-  let fl = 'Tudo';
-  let pend = null;
-  let sure = 0;
-  let tt = 0;
-  let st0 = 0;
-  let booted = 0;
-  let savingState = 'Salvo na nuvem.';
-
-  const nv = document.getElementById('nv');
-  const app = document.getElementById('app');
-  const md = document.getElementById('md');
-  const pick = document.getElementById('pick');
-  const te = document.getElementById('toast');
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;'
-    }[c]));
-  }
-
-  function toast(m) {
-    te.textContent = m;
-    te.classList.add('on');
-    clearTimeout(tt);
-    tt = setTimeout(() => te.classList.remove('on'), 3000);
-  }
-
-  function imgOr(s, ic, a, c) {
-    return s ? '<img src="' + s + '" alt="' + esc(a) + '">' : I(P[ic], c);
-  }
-
-  // --- API CLOUDFLARE ---
   function api(path, method = 'GET', body) {
     return fetch('/api/' + path, {
       method,
-      headers: { 'content-type': 'application/json', 'x-key': KEY },
+      headers: {
+        'content-type': 'application/json',
+        'x-key': KEY
+      },
       body: body === undefined ? undefined : JSON.stringify(body)
     }).then(async r => {
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || 'Erro na requisição');
+      if (!r.ok) throw new Error(j.error || 'Erro na comunicação com o servidor');
       return j;
     });
   }
 
-  function updateSyncText(txt) {
-    savingState = txt;
-    const el = document.getElementById('sync-txt');
-    if (el) el.textContent = txt;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('on');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('on'), 3000);
   }
 
-  function flush() {
-    clearTimeout(st0);
-    if (!ME || !cid) return;
-    updateSyncText('Salvando...');
-    api('sheet/' + cid, 'PUT', cl(S))
-      .then(() => updateSyncText('Salvo na nuvem.'))
-      .catch(err => {
-        updateSyncText('Erro ao salvar.');
-        toast(err.message);
-      });
+  function esc(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[c]));
   }
 
-  function save() {
-    clearTimeout(st0);
-    updateSyncText('Alterações pendentes...');
-    st0 = setTimeout(flush, 650);
+  function calcMod(score) {
+    const val = Number(score) || 10;
+    const mod = Math.floor((val - 10) / 2);
+    return mod >= 0 ? `+${mod}` : `${mod}`;
   }
 
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && st0) flush();
-  });
-
-  // --- COMPRESSÃO DE IMAGEM PARA KV ---
-  function compressImage(file, path, cb) {
-    const isBg = path === 'bg' || path === 'banner';
-    const maxW = isBg ? 960 : 280;
-    const maxH = isBg ? 540 : 280;
-
-    const r = new FileReader();
-    r.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let w = img.width;
-        let h = img.height;
-        if (w > maxW || h > maxH) {
-          const ratio = Math.min(maxW / w, maxH / h);
-          w = Math.round(w * ratio);
-          h = Math.round(h * ratio);
-        }
-        const cv = document.createElement('canvas');
-        cv.width = w;
-        cv.height = h;
-        cv.getContext('2d').drawImage(img, 0, 0, w, h);
-        cb(cv.toDataURL('image/jpeg', 0.82));
-      };
-      img.onerror = () => toast('Não foi possível processar essa imagem.');
-      img.src = r.result;
+  function createDefaultSheet(playerName = '') {
+    return {
+      name: playerName,
+      title: '',
+      level: 1,
+      avatar: '',
+      hp: 20,
+      mhp: 20,
+      tempHp: 0,
+      st: 10,
+      mst: 10,
+      ac: 10,
+      speed: '9m',
+      attrs: { FOR: 10, DES: 10, CON: 10, INT: 10, SAB: 10, CAR: 10 },
+      skills: [],
+      inventory: [],
+      notes: '',
+      mnotes: '',
+      lock: false
     };
-    r.onerror = () => toast('Não foi possível ler essa imagem.');
-    r.readAsDataURL(file);
   }
 
-  // --- AUTENTICAÇÃO & NAVEGAÇÃO ---
+  function normalizeSheet(raw, fallbackName) {
+    const base = createDefaultSheet(fallbackName);
+    if (!raw || typeof raw !== 'object') return base;
+    return {
+      ...base,
+      ...raw,
+      attrs: { ...base.attrs, ...(raw.attrs || {}) },
+      skills: Array.isArray(raw.skills) ? raw.skills : [],
+      inventory: Array.isArray(raw.inventory) ? raw.inventory : []
+    };
+  }
+
+  function initEmbers() {
+    const cv = document.getElementById('cv');
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const resize = () => {
+      cv.width = window.innerWidth;
+      cv.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const sparks = Array.from({ length: 28 }, () => ({
+      x: Math.random() * cv.width,
+      y: Math.random() * cv.height,
+      r: Math.random() * 1.8 + 0.6,
+      vy: -(Math.random() * 0.45 + 0.15),
+      vx: (Math.random() - 0.5) * 0.35,
+      a: Math.random() * 0.6 + 0.2
+    }));
+
+    function tick() {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      sparks.forEach(s => {
+        s.x += s.vx;
+        s.y += s.vy;
+        if (s.y < -10) {
+          s.y = cv.height + 10;
+          s.x = Math.random() * cv.width;
+        }
+        ctx.fillStyle = `rgba(235, 130, 52, ${s.a})`;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      requestAnimationFrame(tick);
+    }
+    tick();
+  }
+
   function boot() {
     if (!KEY) {
       renderLogin();
       return;
     }
+
     api('me')
-      .then(m => {
-        ME = m;
-        loadAll();
+      .then(user => {
+        ME = user;
+        loadAllSheets();
       })
       .catch(() => {
         ME = null;
-        KEY = '';
         sessionStorage.removeItem('fk');
-        renderLogin('Código inválido ou acesso negado.');
+        KEY = '';
+        renderLogin('Código inválido ou sessão expirada.');
       });
   }
 
-  function renderLogin(errMsg = '') {
-    nv.hidden = true;
+  function renderLogin(errorMsg = '') {
+    const nv = document.getElementById('nv');
+    if (nv) nv.hidden = true;
+
+    const app = document.getElementById('app');
     app.innerHTML = `
-      <div class="login-wrap">
-        <section class="pn login-card rise">
-          <div style="margin-bottom:6px;">${I(P.skull, 'sw')}</div>
-          <h1 class="login-title">Entrar na Mesa</h1>
-          <p class="login-sub">Apresente seu código de acesso ou a chave do Santo Ofício.</p>
+      <div class="login-shell">
+        <section class="login-card">
+          <div class="stamp-seal">SANTO OFÍCIO</div>
+          <h1>Acesso à Mesa</h1>
+          <p class="login-sub">Apresente seu salvo-conduto de jogador ou a chave do Inquisidor.</p>
+
           <form id="login-form">
-            <div class="login-field">
-              <input id="lk" type="password" placeholder="Código de acesso" required autocomplete="current-password">
-              <button type="button" class="pw-eye" id="btn-eye" title="Mostrar/Ocultar">👁️</button>
+            <div class="login-input-wrap">
+              <input id="lk" type="password" autocomplete="current-password" placeholder="Código de acesso" required>
+              <button type="button" class="bt" id="toggle-pw" title="Mostrar/Ocultar">👁️</button>
             </div>
-            <button type="submit" class="bt" style="width:100%;">Abrir Grimório</button>
+            <button type="submit" class="bt primary" style="width:100%; padding:11px;">Entrar no Grimório</button>
           </form>
-          ${errMsg ? `<p style="color:#8f111c;font:.9rem var(--tp);margin:12px 0 0;">${esc(errMsg)}</p>` : ''}
+
+          ${errorMsg ? `<p class="login-error">${esc(errorMsg)}</p>` : ''}
         </section>
       </div>
     `;
 
-    const inp = document.getElementById('lk');
-    inp.focus();
+    const input = document.getElementById('lk');
+    const toggleBtn = document.getElementById('toggle-pw');
+    const form = document.getElementById('login-form');
 
-    document.getElementById('btn-eye').onclick = () => {
-      inp.type = inp.type === 'password' ? 'text' : 'password';
+    input.focus();
+    toggleBtn.onclick = () => {
+      input.type = input.type === 'password' ? 'text' : 'password';
     };
 
-    document.getElementById('login-form').onsubmit = e => {
+    form.onsubmit = e => {
       e.preventDefault();
-      const val = inp.value.trim();
+      const val = input.value.trim();
       if (!val) return;
       KEY = val;
       sessionStorage.setItem('fk', KEY);
@@ -262,679 +193,629 @@
   }
 
   function renderNav() {
+    const nv = document.getElementById('nv');
+    if (!nv) return;
     if (!ME) {
       nv.hidden = true;
       return;
     }
+
     nv.hidden = false;
     const isMaster = ME.role === 'master';
 
     nv.innerHTML = `
-      <div class="topbar-group">
-        <span class="role-tag">${isMaster ? '👑 MESTRE' : '✝ ' + esc(ME.name || 'JOGADOR')}</span>
-        <button class="bt ${view === 'sheet' ? 'on' : ''}" data-act="go-sheet">
-          ${isMaster ? 'Fichas da Mesa' : 'Minha Ficha'}
+      <span class="tag-pill">${isMaster ? '👑 Mestre' : `🗡️ ${esc(ME.name)}`}</span>
+      <button class="bt ${currentView === 'sheet' ? 'on' : ''}" data-nav="sheet">
+        ${isMaster ? '📜 Fichas' : '📜 Minha Ficha'}
+      </button>
+      ${isMaster ? `
+        <button class="bt ${currentView === 'admin' ? 'on' : ''}" data-nav="admin">
+          👥 Gerenciar Jogadores
         </button>
-        ${isMaster ? `<button class="bt ${view === 'admin' ? 'on' : ''}" data-act="go-admin">Gerenciar Jogadores</button>` : ''}
-      </div>
-      <div class="topbar-group">
-        <button class="bt" data-act="logout">Sair</button>
-      </div>
+      ` : ''}
+      <button class="bt danger" data-nav="logout">Sair</button>
     `;
+
+    nv.querySelectorAll('[data-nav]').forEach(btn => {
+      btn.onclick = () => {
+        const target = btn.dataset.nav;
+        if (target === 'logout') {
+          sessionStorage.removeItem('fk');
+          KEY = '';
+          ME = null;
+          renderLogin();
+          return;
+        }
+        currentView = target;
+        renderNav();
+        if (currentView === 'admin') renderAdmin();
+        else renderSheetView();
+      };
+    });
   }
 
-  function loadAll() {
+  function loadAllSheets() {
     api('sheets')
-      .then(r => {
-        DATA = (r.players || []).map(p => ({
+      .then(res => {
+        DATA = (res.players || []).map(p => ({
           ...p,
           sheet: normalizeSheet(p.sheet, p.name)
         }));
 
-        if (DATA.length) {
-          if (!cid || !DATA.some(p => p.id === cid)) cid = DATA[0].id;
-          const active = DATA.find(p => p.id === cid);
-          S = active.sheet;
-        } else {
-          cid = '';
-          S = cl(D);
+        if (DATA.length && !DATA.some(p => p.id === selectedPlayerId)) {
+          selectedPlayerId = DATA[0].id;
         }
 
         renderNav();
-        if (view === 'admin' && ME.role === 'master') renderAdmin();
-        else render();
+        if (currentView === 'admin' && ME.role === 'master') renderAdmin();
+        else renderSheetView();
       })
       .catch(err => toast(err.message));
   }
 
-  // --- RENDERIZAÇÃO DA FICHA (O INQUISIDOR DO DESERTO) ---
-  function setPath(p, v) {
-    const k = p.split('.');
-    let o = S;
-    for (let i = 0; i < k.length - 1; i++) o = o[k[i]];
-    o[k[k.length - 1]] = v;
+  function updateSyncIndicator(pending) {
+    hasPendingChanges = pending;
+    const dot = document.getElementById('sync-dot');
+    const label = document.getElementById('sync-label');
+    if (!dot || !label) return;
+    dot.classList.toggle('pending', pending);
+    label.textContent = pending ? 'Salvando alterações...' : 'Ficha salva';
   }
 
-  function vital(k, d) {
-    const v = S[k];
-    const hp = k === 'hp';
-    const L = v.n || VI[k][1];
-    const b = VI[k][2];
-    return (
-      '<section class="pn rise" data-v="' + k + '"' + d + '>' +
-        '<h2>' + VI[k][0] + '<input class="vn" data-set="' + k + '.n" value="' + esc(L) + '" aria-label="Nome da barra"></h2>' +
-        '<div class="nums">' +
-          '<input type="number" min="0" data-set="' + k + '.c" value="' + v.c + '" aria-label="' + esc(L) + ' atual">' +
-          '<span>/</span>' +
-          '<input type="number" min="0" data-set="' + k + '.m" value="' + v.m + '" aria-label="' + esc(L) + ' máxima">' +
-        '</div>' +
-        (hp ? '<svg class="ecg" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,12 30,12 36,12 40,3 46,21 51,12 80,12 86,8 90,12 120,12"/></svg>' : '') +
-        '<div class="bar b1"><i></i></div>' +
-        (hp ? '<div class="xr"><label>Vida extra <input type="number" min="0" data-set="hp.x" value="' + (v.x || 0) + '"></label></div><div class="bar b2"><i></i></div>' : '') +
-        '<div class="ctl">' +
-          '<input type="number" min="1" value="1" data-amt="' + k + '" aria-label="Valor">' +
-          '<button class="bt" data-act="dmg" data-k="' + k + '">' + b[0] + '</button>' +
-          '<button class="bt" data-act="heal" data-k="' + k + '">' + b[1] + '</button>' +
-          (hp ? '<button class="bt" data-act="xtra">+ Extra</button>' : '') +
-        '</div>' +
-        (v.m > 0 ? '' : '<p class="hint mu">Defina o máximo primeiro.</p>') +
-      '</section>'
-    );
+  function scheduleSave(playerEntry) {
+    updateSyncIndicator(true);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveSheetNow(playerEntry, true), 900);
   }
 
-  function paint(k) {
-    const s = document.querySelector('[data-v="' + k + '"]');
-    if (!s) return;
-    const v = S[k];
-    const m = v.m > 0 ? v.m : 0;
-    s.querySelector('.b1 i').style.width = (m ? Math.min(100, (v.c / m) * 100) : 0) + '%';
-    const b = s.querySelector('.b2 i');
-    if (b) b.style.width = (m ? Math.min(100, ((v.x || 0) / m) * 100) : 0) + '%';
-    s.classList.toggle('low', m > 0 && v.c / m <= 0.3);
+  function saveSheetNow(playerEntry, silent = false) {
+    clearTimeout(saveTimer);
+    if (!playerEntry) return;
+    updateSyncIndicator(true);
+
+    api(`sheet/${playerEntry.id}`, 'PUT', playerEntry.sheet)
+      .then(() => {
+        updateSyncIndicator(false);
+        if (!silent) toast('Ficha salva com sucesso!');
+      })
+      .catch(err => toast(err.message));
   }
 
-  function sync(k) {
-    const v = S[k];
-    ['c', 'm', 'x'].forEach(f => {
-      const e = document.querySelector('[data-set="' + k + '.' + f + '"]');
-      if (e && v[f] !== undefined && +e.value !== v[f]) e.value = v[f];
-    });
-    paint(k);
-    save();
-  }
-
-  function fix(k) {
-    const v = S[k];
-    v.m = Math.max(0, v.m || 0);
-    v.c = Math.max(0, Math.min(v.c || 0, v.m));
-    if (k === 'hp') v.x = Math.max(0, v.x || 0);
-    sync(k);
-  }
-
-  function amt(k) {
-    const e = document.querySelector('[data-amt="' + k + '"]');
-    return Math.max(1, parseInt(e && e.value) || 1);
-  }
-
-  function render() {
-    const isMaster = ME && ME.role === 'master';
+  function renderSheetView() {
+    const app = document.getElementById('app');
+    const isMaster = ME.role === 'master';
 
     if (!DATA.length) {
       app.innerHTML = `
-        <section class="pn pn-paper rise" style="grid-column:1/-1;text-align:center;padding:36px 20px;">
-          <h2 style="justify-content:center;">Nenhum Jogador Cadastrado</h2>
-          <p class="mu">${isMaster ? 'Cadastre os jogadores e seus códigos de acesso para abrir as fichas da mesa.' : 'Aguarde o Mestre cadastrar sua ficha.'}</p>
-          ${isMaster ? '<button class="bt" data-act="go-admin">Cadastrar Jogadores</button>' : ''}
-        </section>
+        <div class="poster-card" style="text-align:center; padding:40px 20px;">
+          <h2 class="wanted-title" style="font-size:1.5rem;">Nenhum Jogador Cadastrado</h2>
+          <p style="margin:10px 0 20px;">
+            ${isMaster
+              ? 'Cadastre os jogadores e seus códigos de acesso para liberar as fichas.'
+              : 'Aguarde o Mestre configurar sua ficha.'}
+          </p>
+          ${isMaster ? `<button class="bt primary" id="go-admin-empty">Cadastrar Jogadores</button>` : ''}
+        </div>
       `;
+      const goBtn = document.getElementById('go-admin-empty');
+      if (goBtn) {
+        goBtn.onclick = () => {
+          currentView = 'admin';
+          renderNav();
+          renderAdmin();
+        };
+      }
       return;
     }
 
-    const isLocked = !isMaster && !!S.lock;
-    let n = 0;
-    const d = () => ' style="--d:' + (0.05 + n++ * 0.06).toFixed(2) + 's"';
+    const entry = DATA.find(p => p.id === selectedPlayerId) || DATA[0];
+    selectedPlayerId = entry.id;
+    const s = entry.sheet;
+    const isLockedForPlayer = !isMaster && !!s.lock;
 
-    document.getElementById('bgi').style.backgroundImage = S.bg ? 'url("' + S.bg + '")' : '';
+    const hpPct = s.mhp > 0 ? Math.max(0, Math.min(100, (s.hp / s.mhp) * 100)) : 0;
+    const stPct = s.mst > 0 ? Math.max(0, Math.min(100, (s.st / s.mst) * 100)) : 0;
 
-    const masterStrip = isMaster
-      ? '<div class="master-strip">' +
-          '<div class="player-tabs">' +
-            DATA.map(p =>
-              '<button class="bt ' + (p.id === cid ? 'on' : '') + '" data-act="sel-player" data-id="' + p.id + '">' +
-                esc(p.sheet.name || p.name) +
-              '</button>'
-            ).join('') +
-          '</div>' +
-          '<button class="bt ' + (S.lock ? 'sure' : '') + '" data-act="toggle-lock">' +
-            (S.lock ? '🔒 Atributos Travados' : '🔓 Travar Atributos') +
-          '</button>' +
-        '</div>'
-      : '';
+    app.innerHTML = `
+      <div class="sheet-toolbar">
+        <div class="player-tabs">
+          ${isMaster
+            ? DATA.map(p => `
+                <button class="bt sm ${p.id === entry.id ? 'on' : ''}" data-select-player="${p.id}">
+                  ${esc(p.sheet.name || p.name)}
+                </button>
+              `).join('')
+            : `<span style="font-weight:bold; color:#f2cf88;">Ficha de ${esc(entry.name)}</span>`
+          }
+          ${s.lock ? `<span class="tag-pill">🔒 Atributos Travados</span>` : ''}
+        </div>
 
-    const hero =
-      '<header class="pn hd rise"' + d() + '>' +
-        '<div class="av" data-act="img" data-p="avatar" role="button" tabindex="0" aria-label="Trocar retrato">' +
-          imgOr(S.avatar, 'skull', 'Retrato', 'sw') +
-          '<span class="ov">Trocar imagem</span>' +
-        '</div>' +
-        '<div class="hi">' +
-          '<input class="nm" data-set="name" value="' + esc(S.name) + '" placeholder="Nome do personagem" aria-label="Nome">' +
-          '<div class="sub"><input data-set="title" value="' + esc(S.title) + '" placeholder="Ocupação, classe ou título" aria-label="Título"></div>' +
-          '<div class="mt"><span>“</span><input data-set="motto" value="' + esc(S.motto) + '" placeholder="Uma frase que o define" aria-label="Frase"><span>”</span></div>' +
-        '</div>' +
-      '</header>';
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span class="sync-status">
+            <span class="sync-dot ${hasPendingChanges ? 'pending' : ''}" id="sync-dot"></span>
+            <span id="sync-label">${hasPendingChanges ? 'Salvando alterações...' : 'Ficha salva'}</span>
+          </span>
+          ${isMaster ? `
+            <button class="bt sm gold" id="btn-toggle-lock">
+              ${s.lock ? '🔓 Destravar' : '🔒 Travar'}
+            </button>
+          ` : ''}
+          <button class="bt sm primary" id="btn-save-now">Salvar Agora</button>
+        </div>
+      </div>
 
-    const ban =
-      '<section class="pn bn rise"' + d() + ' data-act="img" data-p="banner" role="button" tabindex="0" aria-label="Trocar banner">' +
-        (S.banner ? '<img src="' + S.banner + '" alt="">' : '<div class="ph"><div>Clique para adicionar um banner<br><small>png, jpg ou gif</small></div></div>') +
-        '<span class="ov">Trocar banner</span>' +
-      '</section>';
+      <!-- CARTAZ PROCURADO -->
+      <section class="poster-card">
+        <div class="poster-header">
+          <h1 class="wanted-title">PROCURADO</h1>
+          <span class="stamp-seal" style="margin:0;">REGISTRO DO SANTO OFÍCIO</span>
+        </div>
 
-    const tabs = ['Tudo'].concat(TN).map(t =>
-      '<button class="' + (fl === t ? 'on' : '') + '" data-act="fl" data-t="' + t + '">' + t + '</button>'
-    ).join('');
+        <div class="hero-body">
+          <div class="avatar-box" id="avatar-trigger" title="Clique para alterar retrato">
+            ${s.avatar
+              ? `<img src="${esc(s.avatar)}" alt="Retrato">`
+              : `<span class="avatar-placeholder">${esc((s.name || entry.name || '?').slice(0, 2).toUpperCase())}</span>`
+            }
+            <div class="avatar-overlay">Alterar Retrato</div>
+          </div>
 
-    const tiles = S.items.map((s, i) => {
-      if (fl !== 'Tudo' && s.t !== fl) return '';
-      return (
-        '<button class="tile pop' + (+s.q <= 0 ? ' z' : '') + '" style="--tc:' + (TY[s.t] || TY.Outro) + ';--d:' + (i * 0.04).toFixed(2) + 's" data-act="open" data-i="' + i + '">' +
-          '<span class="im">' + imgOr(s.img, TIC[s.t] || 'dia', s.n) + (s.dm ? '<b class="dm">' + esc(s.dm) + '</b>' : '') + '</span>' +
-          (+s.q !== 1 ? '<b class="q">×' + (+s.q || 0) + '</b>' : '') +
-          '<span class="tn">' + esc(s.n || 'Sem nome') + '</span>' +
-        '</button>'
-      );
-    }).join('');
+          <div class="hero-fields">
+            <div class="full">
+              <label class="field-label">Nome do Personagem</label>
+              <input class="hero-name-input" data-field="name" value="${esc(s.name)}" placeholder="Nome do personagem">
+            </div>
+            <div>
+              <label class="field-label">Arquétipo / Origem</label>
+              <input data-field="title" value="${esc(s.title)}" placeholder="Ex: Pistoleiro Ocultista">
+            </div>
+            <div>
+              <label class="field-label">Nível</label>
+              <input type="number" min="1" max="20" data-field="level" value="${Number(s.level) || 1}" ${isLockedForPlayer ? 'disabled' : ''}>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    const inv =
-      '<section class="pn pn-wood rise"' + d() + '>' +
-        '<h2>' + I(P.cross, 'gw') + 'Inventário <small>' + S.items.length + '</small></h2>' +
-        '<div class="tabs">' + tabs + '</div>' +
-        '<div class="ig">' + tiles + '<button class="tile add" data-act="addItem" style="--tc:#7a5a58"><span class="im">+</span><span class="tn">Novo item</span></button></div>' +
-      '</section>';
+      <!-- CHAPAS DE FERRO & ECG -->
+      <section class="vitals-grid">
+        <div class="iron-card">
+          <div class="vital-top">
+            <label class="field-label" style="margin:0;">Vitalidade (HP)</label>
+            <div class="vital-controls">
+              <button class="bt icon-only" data-step="hp" data-delta="-1">−</button>
+              <input type="number" data-field="hp" value="${Number(s.hp) || 0}">
+              <span>/</span>
+              <input type="number" data-field="mhp" value="${Number(s.mhp) || 1}">
+              <button class="bt icon-only" data-step="hp" data-delta="1">+</button>
+            </div>
+          </div>
+          <div class="ecg-track">
+            <div class="ecg-fill hp" id="bar-hp" style="width:${hpPct}%;"></div>
+            <svg class="ecg-line" viewBox="0 0 200 20" preserveAspectRatio="none">
+              <polyline fill="none" stroke="rgba(255,220,220,0.55)" stroke-width="1.4" points="0,10 60,10 68,3 76,18 84,6 92,10 200,10"/>
+            </svg>
+          </div>
+        </div>
 
-    const K = S.skills.length
-      ? S.skills.map((s, i) =>
-          '<div class="sk">' +
-            '<div class="si" data-act="img" data-p="skills.' + i + '.img" role="button" tabindex="0" aria-label="Trocar ícone">' + imgOr(s.img, 'sig', s.n, 'sg') + '</div>' +
-            '<div class="sb">' +
-              '<div class="r2">' +
-                '<input data-set="skills.' + i + '.n" value="' + esc(s.n) + '" placeholder="Nome da habilidade" aria-label="Nome">' +
-                '<input data-set="skills.' + i + '.dm" value="' + esc(s.dm) + '" placeholder="Dano" aria-label="Dano">' +
-              '</div>' +
-              '<textarea rows="2" data-set="skills.' + i + '.d" placeholder="O que faz e como funciona" aria-label="Descrição">' + esc(s.d) + '</textarea>' +
-            '</div>' +
-            '<div class="sr">' +
-              '<label class="cs">Custo <input type="number" min="0" data-set="skills.' + i + '.c" value="' + (s.c || 0) + '" aria-label="Custo"></label>' +
-              '<button class="bt" data-act="use" data-i="' + i + '">Usar</button>' +
-              '<button class="bt x" data-act="delSk" data-i="' + i + '" aria-label="Remover habilidade">×</button>' +
-            '</div>' +
-          '</div>'
-        ).join('')
-      : '<p class="mu">Nenhuma habilidade ainda.</p>';
+        <div class="iron-card">
+          <div class="vital-top">
+            <label class="field-label" style="margin:0;">Stamina / Fôlego</label>
+            <div class="vital-controls">
+              <button class="bt icon-only" data-step="st" data-delta="-1">−</button>
+              <input type="number" data-field="st" value="${Number(s.st) || 0}">
+              <span>/</span>
+              <input type="number" data-field="mst" value="${Number(s.mst) || 1}">
+              <button class="bt icon-only" data-step="st" data-delta="1">+</button>
+            </div>
+          </div>
+          <div class="ecg-track">
+            <div class="ecg-fill st" id="bar-st" style="width:${stPct}%;"></div>
+            <svg class="ecg-line" viewBox="0 0 200 20" preserveAspectRatio="none">
+              <polyline fill="none" stroke="rgba(255,240,200,0.5)" stroke-width="1.4" points="0,10 110,10 118,4 126,16 134,8 142,10 200,10"/>
+            </svg>
+          </div>
+        </div>
 
-    const sk =
-      '<section class="pn pn-paper rise"' + d() + '>' +
-        '<h2>' + I(P.sig, 'sg') + 'Habilidades</h2>' +
-        K +
-        '<p><button class="bt" data-act="addSk">Nova habilidade</button></p>' +
-      '</section>';
+        <div class="iron-card" style="display:flex; align-items:center;">
+          <div class="quick-stats" style="width:100%;">
+            <div>
+              <label class="field-label">Defesa</label>
+              <input type="number" data-field="ac" value="${Number(s.ac) || 10}">
+            </div>
+            <div>
+              <label class="field-label">Vida Extra</label>
+              <input type="number" data-field="tempHp" value="${Number(s.tempHp) || 0}">
+            </div>
+            <div>
+              <label class="field-label">Passo</label>
+              <input type="text" data-field="speed" value="${esc(s.speed || '9m')}">
+            </div>
+          </div>
+        </div>
+      </section>
 
-    const side =
-      '<aside class="col">' +
-        '<section class="pn rise"' + d() + '>' +
-          '<h2>' + I(P.skull, 'sw') + 'Atributos' + (S.lock ? ' <small>🔒</small>' : '') + '</h2>' +
-          S.attrs.map((a, i) =>
-            '<div class="at">' +
-              '<input class="an" data-set="attrs.' + i + '.0" value="' + esc(a[0]) + '" aria-label="Nome do atributo"' + (isLocked ? ' disabled' : '') + '>' +
-              modH(i, a[1]) +
-              '<input class="vl" type="number" data-set="attrs.' + i + '.1" value="' + a[1] + '" aria-label="' + esc(a[0]) + '"' + (isLocked ? ' disabled' : '') + '>' +
-              (isLocked ? '' : '<button class="bt x" data-act="delAt" data-i="' + i + '" aria-label="Remover atributo">×</button>') +
-            '</div>'
-          ).join('') +
-          '<p class="hint mu">O número ao lado de cada atributo é a vantagem (+) ou a desvantagem (−) que ele dá.</p>' +
-          (isLocked ? '' : '<p><button class="bt" data-act="addAt">Novo atributo</button></p>') +
-        '</section>' +
-        '<section class="pn pn-paper rise"' + d() + '>' +
-          '<h2>' + I(P.drop, 'gw') + 'Anotações</h2>' +
-          '<textarea rows="9" data-set="notes" placeholder="Escreva o que quiser aqui." aria-label="Anotações">' + esc(S.notes) + '</textarea>' +
-        '</section>' +
-        (isMaster
-          ? '<section class="pn rise"' + d() + '>' +
-              '<h2>' + I(P.cross, 'gw') + 'Notas do Mestre</h2>' +
-              '<textarea rows="5" data-set="mnotes" placeholder="Segredos ocultos do jogador..." aria-label="Notas do Mestre">' + esc(S.mnotes) + '</textarea>' +
-            '</section>'
-          : '') +
-      '</aside>';
+      <!-- COURO RACHADO (ATRIBUTOS) -->
+      <section class="attrs-grid">
+        ${ATTRS.map(a => {
+          const val = Number(s.attrs[a.key]) || 10;
+          return `
+            <div class="attr-card">
+              <span class="attr-code">${a.key}</span>
+              <div class="attr-mod-badge" id="mod-${a.key}">${calcMod(val)}</div>
+              <input type="number" class="attr-score-input" min="1" max="30" data-attr="${a.key}" value="${val}" ${isLockedForPlayer ? 'disabled' : ''}>
+              <span class="attr-sub">${a.name}</span>
+            </div>
+          `;
+        }).join('')}
+      </section>
 
-    const ft =
-      '<footer class="ft mu">' +
-        '<button class="bt" data-act="img" data-p="bg">Plano de fundo</button>' +
-        (S.bg ? '<button class="bt" data-act="rmBg">Remover fundo</button>' : '') +
-        '<button class="bt' + (sure ? ' sure' : '') + '" data-act="reset">' + (sure ? 'Confirmar: apagar tudo' : 'Limpar ficha') + '</button>' +
-        '<button class="bt" data-act="save-now">Salvar agora</button>' +
-        '<span id="sync-txt">' + esc(savingState) + '</span>' +
-      '</footer>';
+      <!-- HABILIDADES & INVENTÁRIO -->
+      <section class="modules-grid">
+        <div class="parchment-card">
+          <div class="card-header">
+            <h2 class="card-title">Habilidades &amp; Rituais</h2>
+            <span class="tag-pill">${s.skills.length}</span>
+          </div>
 
-    app.innerHTML = masterStrip + '<div class="col">' + hero + ban + '<div class="vts">' + vital('hp', d()) + vital('st', d()) + '</div>' + inv + sk + '</div>' + side + ft;
+          <div class="item-list">
+            ${s.skills.length
+              ? s.skills.map((sk, idx) => `
+                  <div class="list-entry">
+                    <div>
+                      <div class="list-entry-title">
+                        <span>${esc(sk.name)}</span>
+                        ${sk.cost ? `<span class="tag-pill">${esc(sk.cost)}</span>` : ''}
+                      </div>
+                      ${sk.desc ? `<p class="list-entry-desc">${esc(sk.desc)}</p>` : ''}
+                    </div>
+                    <div style="display:flex; gap:4px;">
+                      ${sk.cost ? `<button class="bt sm gold" data-use-skill="${idx}">Usar</button>` : ''}
+                      <button class="bt icon-only danger" data-del-skill="${idx}" title="Remover">×</button>
+                    </div>
+                  </div>
+                `).join('')
+              : `<p style="font-size:0.88rem; margin:0;">Nenhuma habilidade registrada.</p>`
+            }
+          </div>
 
-    setTimeout(() => {
-      paint('hp');
-      paint('st');
-    }, booted ? 0 : 350);
+          <form class="inline-add-form" id="form-add-skill">
+            <div class="inline-add-row">
+              <input id="new-skill-name" placeholder="Nome da habilidade" required>
+              <input id="new-skill-cost" placeholder="Custo (ex: 2 ST)">
+            </div>
+            <input id="new-skill-desc" placeholder="Efeito ou descrição">
+            <button type="submit" class="bt sm gold">+ Adicionar Habilidade</button>
+          </form>
+        </div>
 
-    if (!booted) {
-      booted = 1;
-      setTimeout(() => app.classList.add('booted'), 1600);
-    }
+        <div class="wood-card">
+          <div class="card-header">
+            <h2 class="card-title">Inventário &amp; Arsenal</h2>
+            <span class="tag-pill">${s.inventory.length}</span>
+          </div>
+
+          <div class="item-list">
+            ${s.inventory.length
+              ? s.inventory.map((it, idx) => `
+                  <div class="list-entry">
+                    <div style="cursor:pointer; flex:1;" data-inspect-item="${idx}">
+                      <div class="list-entry-title">
+                        <span>${esc(it.name)}</span>
+                        <span class="tag-pill">x${Number(it.qty) || 1}</span>
+                      </div>
+                      ${it.desc ? `<p class="list-entry-desc">${esc(it.desc)}</p>` : ''}
+                    </div>
+                    <button class="bt icon-only danger" data-del-item="${idx}" title="Remover">×</button>
+                  </div>
+                `).join('')
+              : `<p style="font-size:0.88rem; margin:0; opacity:0.8;">Alforje vazio.</p>`
+            }
+          </div>
+
+          <form class="inline-add-form" id="form-add-item">
+            <div class="inline-add-row">
+              <input id="new-item-name" placeholder="Nome do item ou arma" required>
+              <input id="new-item-qty" type="number" min="1" value="1" placeholder="Qtd">
+            </div>
+            <input id="new-item-desc" placeholder="Dano, alcance ou notas">
+            <button type="submit" class="bt sm gold">+ Adicionar Item</button>
+          </form>
+        </div>
+      </section>
+
+      <section class="parchment-card">
+        <div class="card-header">
+          <h2 class="card-title">Diário de Campo &amp; Anotações</h2>
+        </div>
+        <textarea data-field="notes" rows="4" placeholder="Pistas, contatos, pecados e anotações...">${esc(s.notes)}</textarea>
+      </section>
+
+      ${isMaster ? `
+        <section class="master-secret-card">
+          <div class="card-header">
+            <h2 class="card-title">👁️ Dossiê Secreto do Mestre (Oculto do Jogador)</h2>
+          </div>
+          <textarea data-field="mnotes" rows="3" placeholder="Segredos, maldições e ganchos...">${esc(s.mnotes)}</textarea>
+        </section>
+      ` : ''}
+    `;
+
+    bindSheetEvents(entry);
   }
 
-  // --- PAINEL DO MESTRE (GERENCIAR JOGADORES) ---
+  function bindSheetEvents(entry) {
+    const app = document.getElementById('app');
+    const s = entry.sheet;
+
+    app.querySelectorAll('[data-select-player]').forEach(btn => {
+      btn.onclick = () => {
+        selectedPlayerId = btn.dataset.selectPlayer;
+        renderSheetView();
+      };
+    });
+
+    const btnSaveNow = document.getElementById('btn-save-now');
+    if (btnSaveNow) btnSaveNow.onclick = () => saveSheetNow(entry, false);
+
+    const btnLock = document.getElementById('btn-toggle-lock');
+    if (btnLock) {
+      btnLock.onclick = () => {
+        s.lock = !s.lock;
+        saveSheetNow(entry, true);
+        renderSheetView();
+        toast(s.lock ? 'Atributos travados.' : 'Atributos destravados.');
+      };
+    }
+
+    const avatarTrigger = document.getElementById('avatar-trigger');
+    const picker = document.getElementById('pick');
+    if (avatarTrigger && picker) {
+      avatarTrigger.onclick = () => picker.click();
+      picker.onchange = () => {
+        const file = picker.files && picker.files[0];
+        picker.value = '';
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const size = 220;
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            const minSide = Math.min(img.width, img.height);
+            const sx = (img.width - minSide) / 2;
+            const sy = (img.height - minSide) / 2;
+            ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+            s.avatar = canvas.toDataURL('image/jpeg', 0.82);
+            saveSheetNow(entry, true);
+            renderSheetView();
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      };
+    }
+
+    app.querySelectorAll('[data-field]').forEach(el => {
+      el.addEventListener('input', () => {
+        const field = el.dataset.field;
+        s[field] = el.type === 'number' ? Number(el.value) || 0 : el.value;
+
+        if (field === 'hp' || field === 'mhp') {
+          const pct = s.mhp > 0 ? Math.max(0, Math.min(100, (s.hp / s.mhp) * 100)) : 0;
+          const bar = document.getElementById('bar-hp');
+          if (bar) bar.style.width = `${pct}%`;
+        }
+        if (field === 'st' || field === 'mst') {
+          const pct = s.mst > 0 ? Math.max(0, Math.min(100, (s.st / s.mst) * 100)) : 0;
+          const bar = document.getElementById('bar-st');
+          if (bar) bar.style.width = `${pct}%`;
+        }
+        scheduleSave(entry);
+      });
+    });
+
+    app.querySelectorAll('[data-step]').forEach(btn => {
+      btn.onclick = () => {
+        const field = btn.dataset.step;
+        const delta = Number(btn.dataset.delta) || 0;
+        const maxField = field === 'hp' ? 'mhp' : 'mst';
+        s[field] = Math.max(0, Math.min(Number(s[maxField]) || 999, (Number(s[field]) || 0) + delta));
+        scheduleSave(entry);
+        renderSheetView();
+      };
+    });
+
+    app.querySelectorAll('[data-attr]').forEach(el => {
+      el.addEventListener('input', () => {
+        const key = el.dataset.attr;
+        const val = Math.max(1, Math.min(30, Number(el.value) || 10));
+        s.attrs[key] = val;
+        const badge = document.getElementById('mod-' + key);
+        if (badge) badge.textContent = calcMod(val);
+        scheduleSave(entry);
+      });
+    });
+
+    const formSkill = document.getElementById('form-add-skill');
+    if (formSkill) {
+      formSkill.onsubmit = e => {
+        e.preventDefault();
+        const name = document.getElementById('new-skill-name').value.trim();
+        const cost = document.getElementById('new-skill-cost').value.trim();
+        const desc = document.getElementById('new-skill-desc').value.trim();
+        if (!name) return;
+        s.skills.push({ name, cost, desc });
+        saveSheetNow(entry, true);
+        renderSheetView();
+      };
+    }
+
+    app.querySelectorAll('[data-use-skill]').forEach(btn => {
+      btn.onclick = () => {
+        const sk = s.skills[Number(btn.dataset.useSkill)];
+        if (!sk) return;
+        const costNum = parseInt(String(sk.cost || '0').replace(/\D+/g, ''), 10) || 0;
+        if (costNum > 0 && s.st < costNum) {
+          toast('Stamina insuficiente!');
+          return;
+        }
+        if (costNum > 0) s.st = Math.max(0, s.st - costNum);
+        saveSheetNow(entry, true);
+        renderSheetView();
+        toast(`Usou "${sk.name}"${costNum ? ` (−${costNum} ST)` : ''}!`);
+      };
+    });
+
+    app.querySelectorAll('[data-del-skill]').forEach(btn => {
+      btn.onclick = () => {
+        s.skills.splice(Number(btn.dataset.delSkill), 1);
+        saveSheetNow(entry, true);
+        renderSheetView();
+      };
+    });
+
+    const formItem = document.getElementById('form-add-item');
+    if (formItem) {
+      formItem.onsubmit = e => {
+        e.preventDefault();
+        const name = document.getElementById('new-item-name').value.trim();
+        const qty = Math.max(1, Number(document.getElementById('new-item-qty').value) || 1);
+        const desc = document.getElementById('new-item-desc').value.trim();
+        if (!name) return;
+        s.inventory.push({ name, qty, desc });
+        saveSheetNow(entry, true);
+        renderSheetView();
+      };
+    }
+
+    app.querySelectorAll('[data-inspect-item]').forEach(el => {
+      el.onclick = () => {
+        const it = s.inventory[Number(el.dataset.inspectItem)];
+        const md = document.getElementById('md');
+        if (!it || !md) return;
+        md.innerHTML = `
+          <div class="mdl-box" onclick="event.stopPropagation()">
+            <div class="card-header">
+              <h2 class="card-title">${esc(it.name)} (x${Number(it.qty) || 1})</h2>
+              <button class="bt sm danger" id="close-md">Fechar</button>
+            </div>
+            <p style="font-family:'Special Elite',monospace; font-size:0.88rem; line-height:1.5;">
+              ${esc(it.desc || 'Nenhuma descrição registrada para este item.')}
+            </p>
+          </div>
+        `;
+        md.classList.add('on');
+        document.getElementById('close-md').onclick = () => md.classList.remove('on');
+      };
+    });
+
+    app.querySelectorAll('[data-del-item]').forEach(btn => {
+      btn.onclick = () => {
+        s.inventory.splice(Number(btn.dataset.delItem), 1);
+        saveSheetNow(entry, true);
+        renderSheetView();
+      };
+    });
+  }
+
   function renderAdmin() {
+    const app = document.getElementById('app');
     app.innerHTML = `
-      <div class="adm-wrap">
-        <section class="pn pn-paper rise">
-          <h2>${I(P.cross, 'gw')}Novo Jogador</h2>
-          <form id="adm-form" style="display:grid;gap:12px;">
+      <div class="admin-layout">
+        <section class="parchment-card">
+          <div class="card-header">
+            <h2 class="card-title">Novo Jogador</h2>
+          </div>
+          <form id="form-new-player" style="display:grid; gap:12px;">
             <div>
-              <label class="mu" style="font-size:.85rem;">Nome do Jogador</label>
-              <input id="adm-name" placeholder="Ex: Arthur" required>
+              <label class="field-label">Nome do Jogador</label>
+              <input id="adm-new-name" placeholder="Ex: Lucas" required>
             </div>
             <div>
-              <label class="mu" style="font-size:.85rem;">Código de Acesso (PIN)</label>
-              <input id="adm-pin" placeholder="Ex: arthur123" required>
+              <label class="field-label">Código de Acesso (PIN)</label>
+              <input id="adm-new-pin" placeholder="Ex: lucas123" required>
             </div>
-            <button type="submit" class="bt">Cadastrar na Mesa</button>
+            <button type="submit" class="bt primary">Cadastrar Jogador</button>
           </form>
         </section>
 
-        <section class="pn rise">
-          <h2>${I(P.skull, 'sw')}Jogadores da Mesa <small>${DATA.length}</small></h2>
-          ${DATA.length
-            ? DATA.map(p => `
-                <div class="adm-row">
-                  <div>
-                    <strong style="font:400 1.15rem var(--hd);letter-spacing:.05em;color:#f6e2a8;">${esc(p.name)}</strong>
-                    <div style="margin-top:4px;display:flex;gap:8px;align-items:center;">
-                      <span class="mu" style="font-size:.85rem;">Código:</span>
-                      <span class="pin-tag">${esc(p.pin || '—')}</span>
+        <section class="parchment-card">
+          <div class="card-header">
+            <h2 class="card-title">Jogadores da Mesa (${DATA.length})</h2>
+          </div>
+
+          <div style="display:grid; gap:10px;">
+            ${DATA.length
+              ? DATA.map(p => `
+                  <div class="player-row-card">
+                    <div>
+                      <strong style="font-size:1.05rem;">${esc(p.name)}</strong>
+                      <div style="margin-top:4px; display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:0.8rem;">Código:</span>
+                        <span class="pin-badge">${esc(p.pin || '—')}</span>
+                      </div>
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                      <button class="bt sm gold" data-open-sheet="${p.id}">Abrir Ficha</button>
+                      <button class="bt sm danger" data-del-player="${p.id}" data-player-name="${esc(p.name)}">Remover</button>
                     </div>
                   </div>
-                  <div style="display:flex;gap:6px;">
-                    <button class="bt" data-act="open-player-sheet" data-id="${p.id}">Abrir Ficha</button>
-                    <button class="bt x" data-act="del-player" data-id="${p.id}" data-name="${esc(p.name)}" title="Remover">×</button>
-                  </div>
-                </div>
-              `).join('')
-            : '<p class="mu">Nenhum jogador cadastrado ainda.</p>'
-          }
+                `).join('')
+              : `<p style="margin:0;">Nenhum jogador cadastrado ainda.</p>`
+            }
+          </div>
         </section>
       </div>
     `;
 
-    document.getElementById('adm-form').onsubmit = e => {
+    document.getElementById('form-new-player').onsubmit = e => {
       e.preventDefault();
-      const name = document.getElementById('adm-name').value.trim();
-      const pin = document.getElementById('adm-pin').value.trim();
+      const name = document.getElementById('adm-new-name').value.trim();
+      const pin = document.getElementById('adm-new-pin').value.trim();
       if (!name || !pin) return;
 
       api('players', 'POST', { name, pin })
         .then(() => {
           toast('Jogador cadastrado!');
-          loadAll();
+          loadAllSheets();
         })
         .catch(err => toast(err.message));
     };
-  }
 
-  // --- MODAL DO ITEM ---
-  function openItem(i) {
-    oi = i;
-    const s = S.items[i];
-    const p = 'items.' + i;
-    md.innerHTML =
-      '<div class="box pn">' +
-        '<button class="bt x cl" data-act="close" aria-label="Fechar">×</button>' +
-        '<div class="mrow">' +
-          '<div class="mimg" data-act="img" data-p="' + p + '.img" role="button" tabindex="0" aria-label="Trocar imagem">' +
-            imgOr(s.img, TIC[s.t] || 'dia', s.n) +
-            '<span class="ov">Trocar imagem</span>' +
-          '</div>' +
-          '<div class="mf">' +
-            '<input class="mn" data-set="' + p + '.n" value="' + esc(s.n) + '" placeholder="Nome do item" aria-label="Nome do item">' +
-            '<select data-set="' + p + '.t" aria-label="Tipo">' +
-              TN.map(t => '<option' + (t === s.t ? ' selected' : '') + '>' + t + '</option>').join('') +
-            '</select>' +
-            '<div class="qty">' +
-              '<button class="bt" data-act="q" data-n="-1" aria-label="Menos">−</button>' +
-              '<input type="number" min="0" data-set="' + p + '.q" value="' + (+s.q || 0) + '" aria-label="Quantidade">' +
-              '<button class="bt" data-act="q" data-n="1" aria-label="Mais">+</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="r2" style="grid-template-columns:1fr 1.6fr">' +
-          '<input data-set="' + p + '.dm" value="' + esc(s.dm) + '" placeholder="Dano" aria-label="Dano">' +
-          '<input data-set="' + p + '.dt" value="' + esc(s.dt) + '" placeholder="Tipo, alcance ou efeito do dano" aria-label="Tipo de dano">' +
-        '</div>' +
-        '<textarea rows="4" data-set="' + p + '.d" placeholder="Descrição" aria-label="Descrição">' + esc(s.d) + '</textarea>' +
-        '<div class="ctl">' +
-          (s.img ? '<button class="bt" data-act="rmImg">Remover imagem</button>' : '') +
-          '<button class="bt" data-act="delItem">Excluir item</button>' +
-        '</div>' +
-      '</div>';
-
-    requestAnimationFrame(() => md.classList.add('on'));
-  }
-
-  function closeItem() {
-    if (oi < 0) return;
-    oi = -1;
-    md.classList.remove('on');
-    flush();
-    render();
-  }
-
-  // --- EVENTOS GLOBAIS ---
-  pick.addEventListener('change', () => {
-    const f = pick.files && pick.files[0];
-    const p = pend;
-    pick.value = '';
-    pend = null;
-    if (!f || !p) return;
-    if (f.size > 10e6) {
-      toast('Imagem muito grande (máximo 10 MB).');
-      return;
-    }
-    compressImage(f, p, dataUrl => {
-      setPath(p, dataUrl);
-      flush();
-      render();
-      if (oi >= 0) openItem(oi);
+    app.querySelectorAll('[data-open-sheet]').forEach(btn => {
+      btn.onclick = () => {
+        selectedPlayerId = btn.dataset.openSheet;
+        currentView = 'sheet';
+        renderNav();
+        renderSheetView();
+      };
     });
-  });
 
-  document.addEventListener('input', e => {
-    const t = e.target;
-    const p = t.dataset && t.dataset.set;
-    if (!p) return;
-    let v = t.value;
-    if (t.type === 'number') {
-      v = parseFloat(v);
-      if (isNaN(v) || (v < 0 && !/^attrs/.test(p))) v = 0;
-    }
-    setPath(p, v);
-    save();
+    app.querySelectorAll('[data-del-player]').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.delPlayer;
+        const name = btn.dataset.playerName;
+        if (!confirm(`Remover "${name}" e apagar permanentemente sua ficha?`)) return;
 
-    let m = /^(hp|st|sn)\.[cmx]$/.exec(p);
-    if (m) fix(m[1]);
-
-    m = /^attrs\.(\d+)\.1$/.exec(p);
-    if (m) {
-      const el = document.querySelector('[data-mod="' + m[1] + '"]');
-      if (el) {
-        const q = mod(v);
-        el.textContent = sg(q);
-        el.className = 'mod ' + (q > 0 ? 'pos' : q < 0 ? 'neg' : '');
-      }
-    }
-  });
-
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeItem();
-    else if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('role') === 'button') {
-      e.target.click();
-    }
-  });
-
-  document.addEventListener('click', e => {
-    const b = e.target.closest('[data-act]');
-    if (!b) return;
-    if (b === md && e.target !== md) return;
-
-    const a = b.dataset.act;
-    const i = +b.dataset.i;
-    const k = b.dataset.k;
-    let v;
-    let n;
-
-    switch (a) {
-      case 'go-sheet':
-        view = 'sheet';
-        renderNav();
-        render();
-        break;
-      case 'go-admin':
-        view = 'admin';
-        renderNav();
-        renderAdmin();
-        break;
-      case 'logout':
-        sessionStorage.removeItem('fk');
-        KEY = '';
-        ME = null;
-        renderLogin();
-        break;
-      case 'sel-player': {
-        if (st0) flush();
-        cid = b.dataset.id;
-        const found = DATA.find(p => p.id === cid);
-        if (found) S = found.sheet;
-        render();
-        break;
-      }
-      case 'open-player-sheet': {
-        cid = b.dataset.id;
-        const found = DATA.find(p => p.id === cid);
-        if (found) S = found.sheet;
-        view = 'sheet';
-        renderNav();
-        render();
-        break;
-      }
-      case 'del-player': {
-        const pid = b.dataset.id;
-        const pname = b.dataset.name;
-        if (!confirm('Remover "' + pname + '" e apagar permanentemente a ficha?')) return;
-        api('players/' + pid, 'DELETE')
+        api(`players/${id}`, 'DELETE')
           .then(() => {
             toast('Jogador removido.');
-            loadAll();
+            loadAllSheets();
           })
           .catch(err => toast(err.message));
-        break;
-      }
-      case 'toggle-lock':
-        S.lock = !S.lock;
-        flush();
-        render();
-        toast(S.lock ? 'Atributos travados para o jogador.' : 'Atributos destravados.');
-        break;
-      case 'save-now':
-        flush();
-        toast('Ficha salva na nuvem.');
-        break;
-      case 'img':
-        pend = b.dataset.p;
-        pick.click();
-        break;
-      case 'dmg':
-        v = S[k];
-        n = amt(k);
-        if (k === 'hp' && v.x > 0) {
-          const ab = Math.min(v.x, n);
-          v.x -= ab;
-          n -= ab;
-        }
-        v.c = Math.max(0, v.c - n);
-        sync(k);
-        break;
-      case 'heal':
-        v = S[k];
-        v.c = Math.min(v.m, v.c + amt(k));
-        sync(k);
-        break;
-      case 'xtra':
-        S.hp.x = (S.hp.x || 0) + amt('hp');
-        sync('hp');
-        break;
-      case 'fl':
-        fl = b.dataset.t;
-        render();
-        break;
-      case 'open':
-        openItem(i);
-        break;
-      case 'addItem':
-        S.items.push({ n: '', q: 1, t: 'Outro', d: '', dm: '', dt: '' });
-        save();
-        render();
-        openItem(S.items.length - 1);
-        break;
-      case 'close':
-        closeItem();
-        break;
-      case 'q':
-        v = S.items[oi];
-        v.q = Math.max(0, (+v.q || 0) + (+b.dataset.n));
-        md.querySelector('[data-set$=".q"]').value = v.q;
-        save();
-        break;
-      case 'rmImg':
-        delete S.items[oi].img;
-        flush();
-        render();
-        openItem(oi);
-        break;
-      case 'delItem':
-        S.items.splice(oi, 1);
-        oi = -1;
-        md.classList.remove('on');
-        flush();
-        render();
-        break;
-      case 'addSk':
-        S.skills.push({ n: '', c: 0, dm: '', d: '', img: '' });
-        save();
-        render();
-        break;
-      case 'delSk':
-        S.skills.splice(i, 1);
-        save();
-        render();
-        break;
-      case 'addAt':
-        S.attrs.push(['', 0]);
-        save();
-        render();
-        break;
-      case 'delAt':
-        S.attrs.splice(i, 1);
-        save();
-        render();
-        break;
-      case 'use':
-        v = S.skills[i];
-        n = +v.c || 0;
-        if (S.st.c < n) {
-          toast('Não há ' + (S.st.n || 'Stamina') + ' suficiente para ' + (v.n || 'a habilidade') + '.');
-          break;
-        }
-        S.st.c -= n;
-        sync('st');
-        toast('Usou ' + (v.n || 'habilidade') + (n ? ' (−' + n + ')' : ''));
-        break;
-      case 'rmBg':
-        S.bg = '';
-        flush();
-        render();
-        break;
-      case 'reset':
-        if (!sure) {
-          sure = 1;
-          setTimeout(() => {
-            sure = 0;
-            render();
-          }, 4000);
-          render();
-        } else {
-          sure = 0;
-          const keepLock = S.lock;
-          const keepMnotes = S.mnotes;
-          S = cl(D);
-          S.lock = keepLock;
-          S.mnotes = keepMnotes;
-          const active = DATA.find(p => p.id === cid);
-          if (active) active.sheet = S;
-          flush();
-          render();
-          toast('Ficha limpa.');
-        }
-        break;
-    }
-  });
-
-  // --- PARTÍCULAS E GOTAS DE SANGUE ---
-  const cv = document.getElementById('cv');
-  const cx = cv.getContext('2d');
-  let W;
-  let H;
-  let M = [];
-  const rm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  function mk(i) {
-    return {
-      x: Math.random() * W,
-      y: i ? Math.random() * H : H + 8,
-      r: 0.6 + Math.random() * 1.6,
-      v: 0.15 + Math.random() * 0.4,
-      p: Math.random() * 6.28,
-      a: 0.2 + Math.random() * 0.4
-    };
-  }
-
-  function sz() {
-    const r = devicePixelRatio || 1;
-    W = innerWidth;
-    H = innerHeight;
-    cv.width = W * r;
-    cv.height = H * r;
-    cx.setTransform(r, 0, 0, r, 0, 0);
-    M = [];
-    for (let i = 0; i < Math.min(45, (W * H) / 26000); i++) M.push(mk(1));
-  }
-
-  function fr(t) {
-    cx.clearRect(0, 0, W, H);
-    M.forEach(m => {
-      m.y -= m.v;
-      m.x += Math.sin(t / 1700 + m.p) * 0.3;
-      if (m.y < -8) Object.assign(m, mk(0));
-      cx.fillStyle =
-        'rgba(226,58,70,' +
-        (m.a * (0.5 + 0.5 * Math.sin(t / 800 + m.p)) * Math.min(1, m.y / H + 0.2)).toFixed(3) +
-        ')';
-      cx.beginPath();
-      cx.arc(m.x, m.y, m.r, 0, 6.283);
-      cx.fill();
+      };
     });
-    if (!rm) requestAnimationFrame(fr);
   }
 
-  sz();
-  requestAnimationFrame(fr);
-  addEventListener('resize', sz);
-
-  let dh = '';
-  for (let j = 0; j < 8; j++) {
-    dh +=
-      '<i class="dr" style="left:' +
-      (5 + Math.random() * 90).toFixed(1) +
-      '%;--t:' +
-      (6 + Math.random() * 6).toFixed(1) +
-      's;--dl:' +
-      (Math.random() * 9).toFixed(1) +
-      's"></i>';
+  const md = document.getElementById('md');
+  if (md) {
+    md.onclick = () => md.classList.remove('on');
   }
-  document.getElementById('drips').innerHTML = dh;
 
+  initEmbers();
   boot();
 })();
