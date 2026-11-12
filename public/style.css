@@ -1,3 +1,16 @@
+:root {
+  --hd: 'IM Fell English SC', Georgia, serif;
+  --bd: 'IM Fell DW Pica', Georgia, serif;
+  --tp: 'Special Elite', monospace;
+  --paper: #e6d3b1;
+  --paper-dark: #cbb186;
+  --ink: #22150c;
+  --blood: #7c0f16;
+  --blood-bright: #b81d26;
+  --gold: #c99d54;
+  --gold-light: #f0cf8e;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -7,8 +20,9 @@ html, body {
   padding: 0;
   min-height: 100vh;
   background: #140507;
-  color: #241911;
-  font-family: 'IM Fell DW Pica', Georgia, serif;
+  color: var(--ink);
+  font-family: var(--bd);
+  overflow-x: hidden;
 }
 
 .bg {
@@ -25,15 +39,16 @@ html, body {
   inset: 0;
   background-size: cover;
   background-position: center;
-  opacity: 0.22;
+  opacity: 0.28;
   z-index: 0;
   pointer-events: none;
+  transition: background-image 0.4s ease;
 }
 
 .fog {
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at 50% 35%, transparent 35%, rgba(6, 2, 2, 0.78) 100%);
+  background: radial-gradient(circle at 50% 35%, transparent 30%, rgba(5, 1, 2, 0.84) 100%);
   z-index: 1;
   pointer-events: none;
 }
@@ -47,6 +62,48 @@ html, body {
   pointer-events: none;
 }
 
+#fk {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 25%, rgba(255, 175, 85, 0.05), rgba(0, 0, 0, 0.32));
+  animation: lampFlicker 5s infinite alternate;
+}
+
+@keyframes lampFlicker {
+  0%, 100% { opacity: 0.85; }
+  45% { opacity: 1; }
+  52% { opacity: 0.72; }
+  78% { opacity: 0.95; }
+}
+
+#drips {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 90px;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.blood-drip {
+  position: absolute;
+  top: -12px;
+  width: 4px;
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(180deg, #3b0408 0%, #850d15 70%, #b51822 100%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  animation: dripStretch 9s ease-in-out infinite;
+}
+
+@keyframes dripStretch {
+  0%, 100% { transform: scaleY(0.85); opacity: 0.75; }
+  50% { transform: scaleY(1.22); opacity: 0.95; }
+}
+
 /* --- TOPBAR --- */
 .topbar {
   position: sticky;
@@ -58,9 +115,11 @@ html, body {
   justify-content: center;
   gap: 8px;
   padding: 10px 16px;
-  background: linear-gradient(180deg, #241812 0%, #140d09 100%);
-  border-bottom: 2px solid #6b4e2b;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.85);
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 14px),
+    linear-gradient(180deg, #271912 0%, #140c08 100%);
+  border-bottom: 2px solid #6b4c28;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.9);
 }
 
 .topbar[hidden] {
@@ -68,59 +127,60 @@ html, body {
 }
 
 .tag-pill {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.78rem;
-  padding: 5px 10px;
-  border-radius: 4px;
-  background: rgba(114, 21, 21, 0.35);
-  border: 1px solid #8a2c2c;
-  color: #f3dfc1;
+  font-family: var(--tp);
+  font-size: 0.76rem;
+  padding: 4px 10px;
+  border-radius: 3px;
+  background: rgba(124, 15, 22, 0.35);
+  border: 1px solid #8c262c;
+  color: #f4dfc0;
 }
 
 .bt {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.82rem;
+  font-family: var(--tp);
+  font-size: 0.8rem;
   padding: 7px 12px;
   border-radius: 4px;
-  border: 1px solid #6b4f2d;
-  background: #281d16;
-  color: #ecdcc0;
+  border: 1px solid #6e502c;
+  background: linear-gradient(180deg, #2e2017 0%, #1d140e 100%);
+  color: #eddcc0;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 225, 175, 0.12);
   transition: all 0.15s ease;
 }
 
 .bt:hover {
-  border-color: #d6a456;
-  background: #38281e;
+  border-color: var(--gold);
+  background: linear-gradient(180deg, #3c2a1e 0%, #261a12 100%);
 }
 
 .bt.on,
 .bt.primary {
-  background: linear-gradient(180deg, #7d1818 0%, #520d0d 100%);
-  border-color: #d6a456;
-  color: #fff5e0;
-  box-shadow: 0 0 12px rgba(158, 26, 26, 0.45);
+  background: linear-gradient(180deg, #87161c 0%, #520a0e 100%);
+  border-color: var(--gold);
+  color: #fff5e2;
+  box-shadow: 0 0 14px rgba(168, 22, 30, 0.55);
 }
 
 .bt.gold {
-  background: linear-gradient(180deg, #755528 0%, #4f3817 100%);
-  border-color: #d6a456;
+  background: linear-gradient(180deg, #785626 0%, #4d3515 100%);
+  border-color: var(--gold);
   color: #fff6e5;
 }
 
 .bt.danger {
-  border-color: #7d2525;
+  border-color: #7d2222;
   color: #f2abab;
 }
 
 .bt.danger:hover {
-  background: #701414;
+  background: #6e1111;
   color: #fff;
 }
 
 .bt.sm {
   padding: 5px 9px;
-  font-size: 0.76rem;
+  font-size: 0.75rem;
 }
 
 .bt.icon-only {
@@ -139,7 +199,7 @@ html, body {
   z-index: 10;
   max-width: 1040px;
   margin: 0 auto;
-  padding: 22px 16px 60px;
+  padding: 20px 16px 64px;
 }
 
 /* --- LOGIN (INTIMAÇÃO DO SANTO OFÍCIO) --- */
@@ -153,40 +213,42 @@ html, body {
 .login-card {
   width: 100%;
   max-width: 420px;
-  padding: 30px 26px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, #ead8b8 0%, #d4be96 100%);
-  border: 3px solid #593e22;
-  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.9), inset 0 0 36px rgba(92, 61, 28, 0.28);
+  padding: 32px 26px;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 88% 14%, rgba(124, 15, 22, 0.16) 0%, transparent 28%),
+    linear-gradient(180deg, #ebd9b8 0%, #cfb68b 100%);
+  border: 3px solid #573b1f;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.92), inset 0 0 42px rgba(84, 52, 20, 0.34);
   text-align: center;
-  position: relative;
 }
 
 .stamp-seal {
   display: inline-block;
-  font-family: 'IM Fell English SC', serif;
-  font-size: 0.85rem;
+  font-family: var(--hd);
+  font-size: 0.86rem;
   letter-spacing: 0.16em;
-  color: #7a1212;
-  border: 2px solid #7a1212;
+  color: #7c0f16;
+  border: 2px solid #7c0f16;
   padding: 4px 12px;
-  border-radius: 4px;
-  transform: rotate(-2deg);
+  border-radius: 3px;
+  transform: rotate(-2.5deg);
+  box-shadow: inset 0 0 0 1px rgba(124, 15, 22, 0.3);
   margin-bottom: 10px;
 }
 
 .login-card h1 {
-  font-family: 'IM Fell English SC', serif;
+  font-family: var(--hd);
   font-size: 2rem;
-  color: #2b180e;
+  color: #26140a;
   margin: 4px 0 6px;
   letter-spacing: 0.06em;
 }
 
 .login-sub {
-  font-family: 'Special Elite', monospace;
+  font-family: var(--tp);
   font-size: 0.82rem;
-  color: #573e26;
+  color: #543b23;
   margin: 0 0 20px;
 }
 
@@ -202,27 +264,28 @@ html, body {
 
 .login-error {
   margin: 12px 0 0;
-  font-family: 'Special Elite', monospace;
+  font-family: var(--tp);
   font-size: 0.82rem;
   color: #8f1111;
 }
 
-/* --- INPUTS & CAMPOS --- */
+/* --- INPUTS --- */
 input, textarea, select {
   width: 100%;
-  font-family: 'Special Elite', monospace;
-  font-size: 0.88rem;
+  font-family: var(--tp);
+  font-size: 0.86rem;
   padding: 8px 10px;
-  border-radius: 4px;
-  border: 1px solid #6b4f31;
-  background: #f7ecd7;
-  color: #1e130b;
+  border-radius: 3px;
+  border: 1px solid #6b4e2e;
+  background: rgba(249, 239, 219, 0.92);
+  color: #1e120a;
+  box-shadow: inset 0 1px 4px rgba(45, 26, 10, 0.18);
 }
 
 input:focus, textarea:focus, select:focus {
   outline: none;
-  border-color: #8a1919;
-  box-shadow: 0 0 0 2px rgba(138, 25, 25, 0.22);
+  border-color: #8a171d;
+  box-shadow: 0 0 0 2px rgba(138, 23, 29, 0.25);
 }
 
 input:disabled {
@@ -232,11 +295,11 @@ input:disabled {
 
 .field-label {
   display: block;
-  font-family: 'Special Elite', monospace;
-  font-size: 0.74rem;
+  font-family: var(--tp);
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: #4f3822;
+  letter-spacing: 0.06em;
+  color: #4a331d;
   margin-bottom: 4px;
 }
 
@@ -249,10 +312,11 @@ input:disabled {
   gap: 10px;
   padding: 10px 14px;
   margin-bottom: 16px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, #271b15 0%, #19110d 100%);
-  border: 2px solid #5e4427;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #291c15 0%, #170f0b 100%);
+  border: 2px solid #5e4326;
   color: #eddcc0;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.75);
 }
 
 .player-tabs {
@@ -266,8 +330,8 @@ input:disabled {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-family: 'Special Elite', monospace;
-  font-size: 0.76rem;
+  font-family: var(--tp);
+  font-size: 0.75rem;
   color: #cbb592;
 }
 
@@ -282,15 +346,48 @@ input:disabled {
   background: #e09f3e;
 }
 
-/* --- CARTAZ PROCURADO (CABEÇALHO DO PERSONAGEM) --- */
+/* --- MOLDURA DE MADEIRA DO BANNER + CARTAZ PROCURADO --- */
 .poster-card {
-  background: linear-gradient(180deg, #ead8b8 0%, #d3bc93 100%);
-  border: 3px solid #573d21;
+  background:
+    radial-gradient(circle at 92% 88%, rgba(124, 15, 22, 0.14) 0%, transparent 32%),
+    linear-gradient(180deg, #ecdab9 0%, #cfb589 100%);
+  border: 3px solid #573b1f;
   border-radius: 6px;
-  padding: 18px 20px 22px;
-  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(99, 66, 30, 0.25);
+  overflow: hidden;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.85), inset 0 0 46px rgba(89, 57, 23, 0.3);
   margin-bottom: 18px;
   position: relative;
+}
+
+.wood-banner-frame {
+  position: relative;
+  height: 155px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0px, rgba(0,0,0,0.18) 3px, transparent 3px, transparent 18px),
+    linear-gradient(180deg, #3b2416 0%, #22130b 100%);
+  border-bottom: 6px solid #4a2f19;
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+}
+
+.wood-banner-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: sepia(0.25) contrast(1.06);
+}
+
+.wood-banner-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+  z-index: 4;
+}
+
+.poster-inner {
+  padding: 16px 20px 22px;
 }
 
 .poster-header {
@@ -299,22 +396,23 @@ input:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border-bottom: 2px solid #4a2f18;
+  border-bottom: 2px solid #4a2e17;
   padding-bottom: 8px;
   margin-bottom: 16px;
 }
 
 .wanted-title {
-  font-family: 'IM Fell English SC', serif;
-  font-size: 1.9rem;
-  letter-spacing: 0.14em;
-  color: #26140a;
+  font-family: var(--hd);
+  font-size: 2.05rem;
+  letter-spacing: 0.16em;
+  color: #241208;
+  text-shadow: 0 1px 0 rgba(255, 240, 210, 0.5);
   margin: 0;
 }
 
 .hero-body {
   display: grid;
-  grid-template-columns: 150px 1fr;
+  grid-template-columns: 156px 1fr;
   gap: 18px;
   align-items: center;
 }
@@ -326,40 +424,40 @@ input:disabled {
 }
 
 .avatar-box {
-  width: 150px;
-  height: 150px;
+  width: 156px;
+  height: 156px;
   margin: 0 auto;
-  border: 4px solid #4a3118;
-  border-radius: 4px;
-  background: #261a12;
+  border: 5px solid #472d16;
+  border-radius: 3px;
+  background: #231710;
   position: relative;
   overflow: hidden;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.65), inset 0 0 14px rgba(0, 0, 0, 0.8);
 }
 
 .avatar-box img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: sepia(0.18) contrast(1.05);
+  filter: sepia(0.22) contrast(1.06);
 }
 
 .avatar-placeholder {
-  font-family: 'IM Fell English SC', serif;
-  font-size: 2.4rem;
+  font-family: var(--hd);
+  font-size: 2.5rem;
   color: #d9c098;
 }
 
 .avatar-overlay {
   position: absolute;
   inset: auto 0 0 0;
-  background: rgba(20, 10, 6, 0.82);
+  background: rgba(18, 9, 5, 0.85);
   color: #f3e2c4;
-  font-family: 'Special Elite', monospace;
+  font-family: var(--tp);
   font-size: 0.72rem;
   text-align: center;
   padding: 5px;
@@ -376,12 +474,12 @@ input:disabled {
 }
 
 .hero-name-input {
-  font-family: 'IM Fell English SC', serif;
-  font-size: 1.35rem;
+  font-family: var(--hd);
+  font-size: 1.4rem;
   font-weight: bold;
 }
 
-/* --- CHAPAS DE FERRO & ECG (VIDA E STAMINA) --- */
+/* --- CHAPAS DE FERRO ENFERRUJADO & ECG --- */
 .vitals-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -396,16 +494,31 @@ input:disabled {
 }
 
 .iron-card {
-  background: linear-gradient(180deg, #27201d 0%, #171210 100%);
-  border: 2px solid #59442d;
-  border-radius: 6px;
-  padding: 14px;
+  position: relative;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(133, 56, 24, 0.25) 0%, transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(112, 42, 18, 0.28) 0%, transparent 48%),
+    linear-gradient(180deg, #2b2421 0%, #171311 100%);
+  border: 2px solid #5e4731;
+  border-radius: 5px;
+  padding: 14px 16px;
   color: #efe0c6;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.8), inset 0 0 0 1px rgba(255, 215, 165, 0.08);
 }
 
+.iron-card::before,
+.iron-card::after {
+  content: '•';
+  position: absolute;
+  top: 4px;
+  color: #7d6449;
+  font-size: 12px;
+}
+.iron-card::before { left: 7px; }
+.iron-card::after { right: 7px; }
+
 .iron-card .field-label {
-  color: #d7bc91;
+  color: #d9be93;
 }
 
 .vital-top {
@@ -426,16 +539,16 @@ input:disabled {
   width: 56px;
   text-align: center;
   padding: 5px;
-  background: #120d0b;
+  background: #110c0a;
   color: #f7ead2;
   border-color: #6b5033;
 }
 
 .ecg-track {
   position: relative;
-  height: 16px;
-  background: #0d0707;
-  border: 1px solid #4a3520;
+  height: 18px;
+  background: #0a0505;
+  border: 1px solid #4f3922;
   border-radius: 3px;
   overflow: hidden;
 }
@@ -446,11 +559,11 @@ input:disabled {
 }
 
 .ecg-fill.hp {
-  background: linear-gradient(90deg, #5e0b0b 0%, #b81d1d 100%);
+  background: linear-gradient(90deg, #5c090d 0%, #c41d26 100%);
 }
 
 .ecg-fill.st {
-  background: linear-gradient(90deg, #6e4714 0%, #c98a2c 100%);
+  background: linear-gradient(90deg, #6e4512 0%, #cf8d29 100%);
 }
 
 .ecg-line {
@@ -470,14 +583,14 @@ input:disabled {
 
 .quick-stats input {
   text-align: center;
-  background: #120d0b;
+  background: #110c0a;
   color: #f7ead2;
   border-color: #6b5033;
   font-size: 1rem;
   font-weight: bold;
 }
 
-/* --- COURO RACHADO (6 ATRIBUTOS) --- */
+/* --- COURO RACHADO COM REBITES (6 ATRIBUTOS) --- */
 .attrs-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -492,29 +605,47 @@ input:disabled {
 }
 
 .attr-card {
-  background: linear-gradient(180deg, #3a2316 0%, #24140c 100%);
-  border: 2px solid #755332;
+  position: relative;
+  background:
+    repeating-linear-gradient(135deg, rgba(0,0,0,0.14) 0px, rgba(0,0,0,0.14) 1px, transparent 1px, transparent 11px),
+    radial-gradient(circle at 50% 30%, #462919 0%, #24130b 100%);
+  border: 2px solid #7c5834;
   border-radius: 6px;
   padding: 12px 8px;
   text-align: center;
   color: #f4e5ca;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(224, 179, 108, 0.2);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.78), inset 0 0 16px rgba(0, 0, 0, 0.65);
 }
+
+.attr-card::before,
+.attr-card::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #e6c07b, #6b4923);
+  box-shadow: 0 1px 2px #000;
+}
+.attr-card::before { left: 6px; }
+.attr-card::after { right: 6px; }
 
 .attr-code {
   display: block;
-  font-family: 'IM Fell English SC', serif;
+  font-family: var(--hd);
   font-size: 1.05rem;
   color: #e6bf7c;
   letter-spacing: 0.08em;
 }
 
 .attr-mod-badge {
-  font-family: 'IM Fell English SC', serif;
-  font-size: 1.65rem;
+  font-family: var(--hd);
+  font-size: 1.7rem;
   font-weight: bold;
   color: #fff4de;
   margin: 4px 0;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
 }
 
 .attr-score-input {
@@ -522,19 +653,19 @@ input:disabled {
   margin: 0 auto 4px;
   text-align: center;
   padding: 4px;
-  background: #160c07;
+  background: #140b06;
   color: #f4e5ca;
-  border-color: #755332;
+  border-color: #7c5834;
 }
 
 .attr-sub {
   display: block;
-  font-family: 'Special Elite', monospace;
+  font-family: var(--tp);
   font-size: 0.68rem;
   color: #cbb089;
 }
 
-/* --- BLOCOS DE HABILIDADES & INVENTÁRIO --- */
+/* --- LIVRO-RAZÃO COM MANCHA DE SANGUE (HABILIDADES) & TÁBUA QUEIMADA (INVENTÁRIO) --- */
 .modules-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -549,40 +680,46 @@ input:disabled {
 }
 
 .parchment-card {
-  background: linear-gradient(180deg, #ead9ba 0%, #d4be96 100%);
+  background:
+    radial-gradient(circle at 86% 22%, rgba(124, 15, 22, 0.18) 0%, rgba(124, 15, 22, 0.06) 14%, transparent 28%),
+    repeating-linear-gradient(180deg, transparent 0px, transparent 27px, rgba(94, 64, 34, 0.12) 28px),
+    linear-gradient(180deg, #ebd9b9 0%, #d2ba90 100%);
   border: 2px solid #5c4124;
-  border-radius: 6px;
+  border-radius: 5px;
   padding: 16px;
   color: #24180f;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.78), inset 0 0 32px rgba(89, 57, 23, 0.25);
 }
 
 .wood-card {
-  background: linear-gradient(180deg, #2d1e15 0%, #1c120c 100%);
-  border: 2px solid #6b4c2b;
-  border-radius: 6px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.22) 0px, rgba(0,0,0,0.22) 2px, transparent 2px, transparent 22px),
+    radial-gradient(circle at 20% 85%, rgba(10, 5, 2, 0.75) 0%, transparent 55%),
+    linear-gradient(180deg, #332014 0%, #1a0f09 100%);
+  border: 2px solid #6e4d2b;
+  border-radius: 5px;
   padding: 16px;
   color: #f0e1c6;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.82), inset 0 0 28px rgba(0, 0, 0, 0.75);
 }
 
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(130, 96, 56, 0.38);
+  border-bottom: 1px solid rgba(130, 96, 56, 0.42);
   padding-bottom: 8px;
   margin-bottom: 12px;
 }
 
 .card-title {
-  font-family: 'IM Fell English SC', serif;
-  font-size: 1.2rem;
+  font-family: var(--hd);
+  font-size: 1.22rem;
   margin: 0;
 }
 
 .parchment-card .card-title {
-  color: #5e1111;
+  color: #631015;
 }
 
 .wood-card .card-title {
@@ -602,13 +739,13 @@ input:disabled {
   gap: 8px;
   padding: 8px 10px;
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(110, 80, 46, 0.32);
+  background: rgba(45, 28, 12, 0.08);
+  border: 1px solid rgba(110, 80, 46, 0.35);
 }
 
 .wood-card .list-entry {
-  background: rgba(0, 0, 0, 0.32);
-  border-color: #4f3720;
+  background: rgba(0, 0, 0, 0.38);
+  border-color: #543a21;
 }
 
 .list-entry-title {
@@ -621,7 +758,7 @@ input:disabled {
 
 .list-entry-desc {
   margin: 3px 0 0;
-  font-family: 'Special Elite', monospace;
+  font-family: var(--tp);
   font-size: 0.76rem;
   opacity: 0.85;
 }
@@ -630,7 +767,7 @@ input:disabled {
   display: grid;
   gap: 8px;
   padding-top: 10px;
-  border-top: 1px dashed rgba(120, 88, 52, 0.4);
+  border-top: 1px dashed rgba(120, 88, 52, 0.45);
 }
 
 .inline-add-row {
@@ -643,7 +780,7 @@ input:disabled {
   margin-top: 18px;
   background: linear-gradient(180deg, #2b1012 0%, #190809 100%);
   border: 2px solid #8a2424;
-  border-radius: 6px;
+  border-radius: 5px;
   padding: 16px;
   color: #f4dede;
 }
@@ -678,7 +815,7 @@ input:disabled {
 }
 
 .pin-badge {
-  font-family: 'Special Elite', monospace;
+  font-family: var(--tp);
   padding: 2px 8px;
   border-radius: 3px;
   background: #241811;
@@ -691,11 +828,12 @@ input:disabled {
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: rgba(8, 4, 4, 0.82);
+  background: rgba(8, 4, 4, 0.84);
   display: none;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  backdrop-filter: blur(3px);
 }
 
 .mdl.on {
@@ -704,13 +842,13 @@ input:disabled {
 
 .mdl-box {
   width: 100%;
-  max-width: 460px;
-  background: linear-gradient(180deg, #ead9ba 0%, #d4be96 100%);
-  border: 3px solid #593e22;
-  border-radius: 6px;
+  max-width: 480px;
+  background: linear-gradient(180deg, #ebd9b9 0%, #d2ba90 100%);
+  border: 3px solid #573b1f;
+  border-radius: 5px;
   padding: 20px;
   color: #24180f;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.92);
 }
 
 #toast {
@@ -721,9 +859,9 @@ input:disabled {
   padding: 10px 16px;
   border-radius: 4px;
   background: #231610;
-  border: 1px solid #d6a456;
+  border: 1px solid var(--gold);
   color: #f7ead2;
-  font-family: 'Special Elite', monospace;
+  font-family: var(--tp);
   font-size: 0.84rem;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.85);
   opacity: 0;
