@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Ficha de RPG — Santo Ofício</title>
+  <title>Santo Ofício — Mesa &amp; Grimório</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+DW+Pica:ital@0;1&family=IM+Fell+English+SC&family=Special+Elite&display=swap">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="vtt.css">
 </head>
 <body>
   <svg class="bg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
@@ -41,8 +42,10 @@
 
   <div class="mdl" id="md" data-act="close"></div>
   <input type="file" id="pick" accept="image/*" hidden>
+  <input type="file" id="vtt-file-pick" accept="image/*" hidden>
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script src="player-sheet.js"></script>
+  <script src="vtt-map.js"></script>
 </body>
 </html>
