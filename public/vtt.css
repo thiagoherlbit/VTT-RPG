@@ -1,0 +1,511 @@
+/* Estilos do Tabletop VTT e Biblioteca de Mapas & NPCs — Tema Santo Ofício */
+
+.wrap.vtt-wide {
+  max-width: 1520px;
+  padding-bottom: 24px;
+}
+
+.vtt-workbench {
+  display: grid;
+  grid-template-columns: 1fr 330px;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .vtt-workbench {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- PAINEL PRINCIPAL DO MAPA --- */
+.vtt-board-card {
+  background: linear-gradient(180deg, #1b1512 0%, #110d0b 100%);
+  border: 2px solid #59442b;
+  border-radius: 6px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.78), inset 0 0 0 1px rgba(200, 157, 84, 0.16);
+  overflow: hidden;
+}
+
+.vtt-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #271e19 0%, #1a1310 100%);
+  border-bottom: 1px solid #4d3a24;
+}
+
+.vtt-tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.vtt-scene-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 1.15rem;
+  color: #e9c98b;
+  letter-spacing: 0.04em;
+  margin-right: 6px;
+}
+
+.vtt-btn {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.78rem;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid #5d472c;
+  background: #241b16;
+  color: #e6d5b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vtt-btn:hover {
+  border-color: #c89d54;
+  background: #33261e;
+}
+
+.vtt-btn.active {
+  background: #7a1818;
+  border-color: #d99b4e;
+  color: #fff3dc;
+  box-shadow: 0 0 10px rgba(168, 28, 28, 0.45);
+}
+
+.vtt-btn.gold {
+  background: linear-gradient(180deg, #6e5128 0%, #4d3719 100%);
+  border-color: #c89d54;
+  color: #fff4dc;
+}
+
+.vtt-btn.danger {
+  border-color: #7d2424;
+  color: #f0a8a8;
+}
+
+.vtt-btn.danger:hover {
+  background: #6b1515;
+  color: #fff;
+}
+
+.vtt-select,
+.vtt-input {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.82rem;
+  padding: 6px 9px;
+  border-radius: 4px;
+  border: 1px solid #59442b;
+  background: #140f0d;
+  color: #ecdcc2;
+}
+
+/* --- VIEWPORT & PALCO DO MAPA --- */
+.vtt-viewport {
+  position: relative;
+  width: 100%;
+  height: 74vh;
+  min-height: 460px;
+  overflow: hidden;
+  background: radial-gradient(circle at center, #1e1815 0%, #0b0807 100%);
+  user-select: none;
+  touch-action: none;
+}
+
+.vtt-pan-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+}
+
+.vtt-stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  max-height: 100%;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
+}
+
+.vtt-stage img#vtt-bg-img {
+  display: block;
+  max-width: 100%;
+  max-height: 74vh;
+  width: auto;
+  height: auto;
+  pointer-events: none;
+}
+
+.vtt-empty-map {
+  width: 820px;
+  max-width: 92vw;
+  height: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 2px dashed #5d472c;
+  color: #bfa988;
+  font-family: 'IM Fell DW Pica', serif;
+  font-size: 1.15rem;
+  text-align: center;
+  padding: 20px;
+}
+
+.vtt-grid-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.vtt-tokens-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#vtt-fog-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+#vtt-fog-canvas.painting {
+  pointer-events: auto;
+  cursor: none;
+}
+
+.vtt-ruler-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 25;
+}
+
+.vtt-brush-cursor {
+  position: absolute;
+  border: 2px dashed #f5d28c;
+  border-radius: 50%;
+  background: rgba(245, 210, 140, 0.14);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: none;
+  z-index: 30;
+}
+
+/* --- TOKENS NO MAPA --- */
+.vtt-token {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 3px solid #c89d54;
+  background: #241914;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 15;
+  transition: box-shadow 0.15s ease;
+}
+
+.vtt-token.movable {
+  cursor: grab;
+}
+
+.vtt-token.movable:active {
+  cursor: grabbing;
+  z-index: 22;
+}
+
+.vtt-token.mine {
+  box-shadow: 0 0 0 2px #f2cf7e, 0 6px 16px rgba(0, 0, 0, 0.9);
+}
+
+.vtt-token img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.vtt-token-initials {
+  font-family: 'IM Fell English SC', serif;
+  color: #f7ead2;
+  font-size: 0.95rem;
+  font-weight: bold;
+  pointer-events: none;
+}
+
+.vtt-token-tag {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(16, 11, 9, 0.88);
+  border: 1px solid #5c462b;
+  color: #f4e6cc;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.vtt-token-hp {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 82%;
+  height: 4px;
+  background: #1a0606;
+  border: 1px solid #000;
+  border-radius: 2px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.vtt-token-hp > i {
+  display: block;
+  height: 100%;
+  background: #b82323;
+}
+
+/* --- BARRA LATERAL: ELENCO DA MESA (PÔR / TIRAR JOGADORES & NPCS) --- */
+.vtt-sidebar {
+  display: grid;
+  gap: 14px;
+}
+
+.vtt-side-box {
+  background: linear-gradient(180deg, #e7d6b7 0%, #d4be98 100%);
+  color: #241911;
+  border: 2px solid #594127;
+  border-radius: 6px;
+  padding: 12px 14px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.65);
+}
+
+.vtt-side-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 1.05rem;
+  color: #4a1212;
+  border-bottom: 1px solid rgba(74, 18, 18, 0.28);
+  padding-bottom: 6px;
+  margin: 0 0 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vtt-roster-list {
+  display: grid;
+  gap: 8px;
+}
+
+.vtt-roster-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 8px;
+  background: rgba(45, 31, 18, 0.08);
+  border: 1px solid rgba(75, 52, 29, 0.28);
+  border-radius: 4px;
+}
+
+.vtt-roster-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vtt-mini-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #5c3d20;
+  background: #2b1d14;
+  color: #f3e4c8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 0.85rem;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.vtt-mini-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vtt-roster-meta {
+  min-width: 0;
+}
+
+.vtt-roster-name {
+  display: block;
+  font-family: 'IM Fell DW Pica', serif;
+  font-weight: bold;
+  font-size: 0.95rem;
+  color: #1f140c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vtt-roster-sub {
+  display: block;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.72rem;
+  color: #5a422b;
+}
+
+.vtt-toggle-seat {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.72rem;
+  padding: 5px 8px;
+  border-radius: 4px;
+  border: 1px solid #4d361f;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.vtt-toggle-seat.in {
+  background: #7b1818;
+  color: #fff2dc;
+  border-color: #4f0d0d;
+}
+
+.vtt-toggle-seat.out {
+  background: #275432;
+  color: #eef9f0;
+  border-color: #17381f;
+}
+
+/* --- ABA DE BIBLIOTECA: MAPAS & NPCS --- */
+.vtt-lib-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .vtt-lib-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vtt-lib-panel {
+  background: linear-gradient(180deg, #e8d8ba 0%, #d5c09b 100%);
+  color: #23170f;
+  border: 2px solid #594127;
+  border-radius: 6px;
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+}
+
+.vtt-lib-panel h2 {
+  font-family: 'IM Fell English SC', serif;
+  color: #5c1111;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid rgba(92, 17, 17, 0.28);
+}
+
+.vtt-form-box {
+  background: rgba(58, 40, 22, 0.08);
+  border: 1px solid rgba(89, 65, 39, 0.35);
+  border-radius: 5px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.vtt-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.vtt-form-label {
+  display: block;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.75rem;
+  color: #4a3520;
+  margin-bottom: 3px;
+}
+
+.vtt-field {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.84rem;
+  padding: 7px 9px;
+  border-radius: 4px;
+  border: 1px solid #6b5033;
+  background: #f6ebd6;
+  color: #1e140c;
+}
+
+.vtt-img-picker-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.vtt-cards-list {
+  display: grid;
+  gap: 10px;
+}
+
+.vtt-saved-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  background: #f4e7ce;
+  border: 1px solid #755838;
+  border-radius: 5px;
+}
+
+.vtt-map-thumb {
+  width: 78px;
+  height: 52px;
+  border-radius: 4px;
+  border: 1px solid #594127;
+  background: #231914;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.vtt-npc-thumb {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 3px solid #8a1c1c;
+  background: #231914;
+  object-fit: cover;
+  flex-shrink: 0;
+}
