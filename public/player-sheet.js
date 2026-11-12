@@ -6,6 +6,7 @@
   let currentView = 'sheet';
   let saveTimer = null;
   let hasPendingChanges = false;
+  let pickMode = 'avatar';
 
   const ATTRS = [
     { key: 'FOR', name: 'Força' },
@@ -62,6 +63,8 @@
       title: '',
       level: 1,
       avatar: '',
+      banner: '',
+      pageBg: '',
       hp: 20,
       mhp: 20,
       tempHp: 0,
@@ -90,7 +93,25 @@
     };
   }
 
-  function initEmbers() {
+  function applyPageBackground(url) {
+    const bgi = document.getElementById('bgi');
+    if (!bgi) return;
+    bgi.style.backgroundImage = url ? `url("${url}")` : '';
+  }
+
+  function initAtmosphere() {
+    const drips = document.getElementById('drips');
+    if (drips && !drips.children.length) {
+      for (let i = 0; i < 14; i++) {
+        const d = document.createElement('span');
+        d.className = 'blood-drip';
+        d.style.left = `${(i * 7.3 + 2) % 98}%`;
+        d.style.height = `${22 + (i % 5) * 14}px`;
+        d.style.animationDelay = `${(i * 0.7) % 5}s`;
+        drips.appendChild(d);
+      }
+    }
+
     const cv = document.getElementById('cv');
     if (!cv) return;
     const ctx = cv.getContext('2d');
@@ -101,13 +122,13 @@
     resize();
     window.addEventListener('resize', resize);
 
-    const sparks = Array.from({ length: 28 }, () => ({
+    const sparks = Array.from({ length: 30 }, () => ({
       x: Math.random() * cv.width,
       y: Math.random() * cv.height,
-      r: Math.random() * 1.8 + 0.6,
+      r: Math.random() * 1.9 + 0.6,
       vy: -(Math.random() * 0.45 + 0.15),
       vx: (Math.random() - 0.5) * 0.35,
-      a: Math.random() * 0.6 + 0.2
+      a: Math.random() * 0.65 + 0.2
     }));
 
     function tick() {
@@ -149,6 +170,7 @@
   }
 
   function renderLogin(errorMsg = '') {
+    applyPageBackground('');
     const nv = document.getElementById('nv');
     if (nv) nv.hidden = true;
 
@@ -313,6 +335,8 @@
     const s = entry.sheet;
     const isLockedForPlayer = !isMaster && !!s.lock;
 
+    applyPageBackground(s.pageBg || '');
+
     const hpPct = s.mhp > 0 ? Math.max(0, Math.min(100, (s.hp / s.mhp) * 100)) : 0;
     const stPct = s.mst > 0 ? Math.max(0, Math.min(100, (s.st / s.mst) * 100)) : 0;
 
@@ -330,7 +354,7 @@
           ${s.lock ? `<span class="tag-pill">🔒 Atributos Travados</span>` : ''}
         </div>
 
-        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
           <span class="sync-status">
             <span class="sync-dot ${hasPendingChanges ? 'pending' : ''}" id="sync-dot"></span>
             <span id="sync-label">${hasPendingChanges ? 'Salvando alterações...' : 'Ficha salva'}</span>
@@ -344,40 +368,50 @@
         </div>
       </div>
 
-      <!-- CARTAZ PROCURADO -->
+      <!-- MOLDURA DE MADEIRA + CARTAZ PROCURADO -->
       <section class="poster-card">
-        <div class="poster-header">
-          <h1 class="wanted-title">PROCURADO</h1>
-          <span class="stamp-seal" style="margin:0;">REGISTRO DO SANTO OFÍCIO</span>
+        <div class="wood-banner-frame">
+          ${s.banner ? `<img src="${esc(s.banner)}" alt="Banner">` : ''}
+          <div class="wood-banner-actions">
+            <button class="bt sm" id="btn-pick-banner" title="Trocar imagem do banner">🖼️ Banner</button>
+            <button class="bt sm" id="btn-pick-bg" title="Trocar fundo da página">🌄 Fundo</button>
+          </div>
         </div>
 
-        <div class="hero-body">
-          <div class="avatar-box" id="avatar-trigger" title="Clique para alterar retrato">
-            ${s.avatar
-              ? `<img src="${esc(s.avatar)}" alt="Retrato">`
-              : `<span class="avatar-placeholder">${esc((s.name || entry.name || '?').slice(0, 2).toUpperCase())}</span>`
-            }
-            <div class="avatar-overlay">Alterar Retrato</div>
+        <div class="poster-inner">
+          <div class="poster-header">
+            <h1 class="wanted-title">PROCURADO</h1>
+            <span class="stamp-seal" style="margin:0;">SANTO OFÍCIO</span>
           </div>
 
-          <div class="hero-fields">
-            <div class="full">
-              <label class="field-label">Nome do Personagem</label>
-              <input class="hero-name-input" data-field="name" value="${esc(s.name)}" placeholder="Nome do personagem">
+          <div class="hero-body">
+            <div class="avatar-box" id="avatar-trigger" title="Clique para alterar retrato">
+              ${s.avatar
+                ? `<img src="${esc(s.avatar)}" alt="Retrato">`
+                : `<span class="avatar-placeholder">${esc((s.name || entry.name || '?').slice(0, 2).toUpperCase())}</span>`
+              }
+              <div class="avatar-overlay">Alterar Retrato</div>
             </div>
-            <div>
-              <label class="field-label">Arquétipo / Origem</label>
-              <input data-field="title" value="${esc(s.title)}" placeholder="Ex: Pistoleiro Ocultista">
-            </div>
-            <div>
-              <label class="field-label">Nível</label>
-              <input type="number" min="1" max="20" data-field="level" value="${Number(s.level) || 1}" ${isLockedForPlayer ? 'disabled' : ''}>
+
+            <div class="hero-fields">
+              <div class="full">
+                <label class="field-label">Nome do Personagem</label>
+                <input class="hero-name-input" data-field="name" value="${esc(s.name)}" placeholder="Nome do personagem">
+              </div>
+              <div>
+                <label class="field-label">Arquétipo / Origem</label>
+                <input data-field="title" value="${esc(s.title)}" placeholder="Ex: Pistoleiro Ocultista">
+              </div>
+              <div>
+                <label class="field-label">Nível</label>
+                <input type="number" min="1" max="20" data-field="level" value="${Number(s.level) || 1}" ${isLockedForPlayer ? 'disabled' : ''}>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- CHAPAS DE FERRO & ECG -->
+      <!-- CHAPAS DE FERRO ENFERRUJADO & ECG -->
       <section class="vitals-grid">
         <div class="iron-card">
           <div class="vital-top">
@@ -393,7 +427,7 @@
           <div class="ecg-track">
             <div class="ecg-fill hp" id="bar-hp" style="width:${hpPct}%;"></div>
             <svg class="ecg-line" viewBox="0 0 200 20" preserveAspectRatio="none">
-              <polyline fill="none" stroke="rgba(255,220,220,0.55)" stroke-width="1.4" points="0,10 60,10 68,3 76,18 84,6 92,10 200,10"/>
+              <polyline fill="none" stroke="rgba(255,220,220,0.6)" stroke-width="1.5" points="0,10 60,10 68,3 76,18 84,6 92,10 200,10"/>
             </svg>
           </div>
         </div>
@@ -412,7 +446,7 @@
           <div class="ecg-track">
             <div class="ecg-fill st" id="bar-st" style="width:${stPct}%;"></div>
             <svg class="ecg-line" viewBox="0 0 200 20" preserveAspectRatio="none">
-              <polyline fill="none" stroke="rgba(255,240,200,0.5)" stroke-width="1.4" points="0,10 110,10 118,4 126,16 134,8 142,10 200,10"/>
+              <polyline fill="none" stroke="rgba(255,240,200,0.55)" stroke-width="1.5" points="0,10 110,10 118,4 126,16 134,8 142,10 200,10"/>
             </svg>
           </div>
         </div>
@@ -435,7 +469,7 @@
         </div>
       </section>
 
-      <!-- COURO RACHADO (ATRIBUTOS) -->
+      <!-- COURO RACHADO COM REBITES (ATRIBUTOS) -->
       <section class="attrs-grid">
         ${ATTRS.map(a => {
           const val = Number(s.attrs[a.key]) || 10;
@@ -450,7 +484,7 @@
         }).join('')}
       </section>
 
-      <!-- HABILIDADES & INVENTÁRIO -->
+      <!-- LIVRO-RAZÃO (HABILIDADES) & TÁBUA QUEIMADA (INVENTÁRIO) -->
       <section class="modules-grid">
         <div class="parchment-card">
           <div class="card-header">
@@ -568,10 +602,23 @@
       };
     }
 
-    const avatarTrigger = document.getElementById('avatar-trigger');
     const picker = document.getElementById('pick');
-    if (avatarTrigger && picker) {
-      avatarTrigger.onclick = () => picker.click();
+    const triggerImagePick = mode => {
+      if (!picker) return;
+      pickMode = mode;
+      picker.click();
+    };
+
+    const avatarTrigger = document.getElementById('avatar-trigger');
+    if (avatarTrigger) avatarTrigger.onclick = () => triggerImagePick('avatar');
+
+    const btnBanner = document.getElementById('btn-pick-banner');
+    if (btnBanner) btnBanner.onclick = () => triggerImagePick('banner');
+
+    const btnBg = document.getElementById('btn-pick-bg');
+    if (btnBg) btnBg.onclick = () => triggerImagePick('pageBg');
+
+    if (picker) {
       picker.onchange = () => {
         const file = picker.files && picker.files[0];
         picker.value = '';
@@ -581,15 +628,26 @@
           const img = new Image();
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const size = 220;
-            canvas.width = size;
-            canvas.height = size;
             const ctx = canvas.getContext('2d');
-            const minSide = Math.min(img.width, img.height);
-            const sx = (img.width - minSide) / 2;
-            const sy = (img.height - minSide) / 2;
-            ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
-            s.avatar = canvas.toDataURL('image/jpeg', 0.82);
+
+            if (pickMode === 'avatar') {
+              const size = 220;
+              canvas.width = size;
+              canvas.height = size;
+              const minSide = Math.min(img.width, img.height);
+              const sx = (img.width - minSide) / 2;
+              const sy = (img.height - minSide) / 2;
+              ctx.drawImage(img, sx, sy, minSide, minSide, 0, 0, size, size);
+              s.avatar = canvas.toDataURL('image/jpeg', 0.82);
+            } else {
+              const maxW = pickMode === 'banner' ? 1000 : 1280;
+              const ratio = Math.min(1, maxW / img.width);
+              canvas.width = Math.round(img.width * ratio);
+              canvas.height = Math.round(img.height * ratio);
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              s[pickMode] = canvas.toDataURL('image/jpeg', 0.76);
+            }
+
             saveSheetNow(entry, true);
             renderSheetView();
           };
@@ -816,6 +874,6 @@
     md.onclick = () => md.classList.remove('on');
   }
 
-  initEmbers();
+  initAtmosphere();
   boot();
 })();
