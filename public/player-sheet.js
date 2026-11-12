@@ -1,1097 +1,940 @@
 (function () {
-  let activeTab = 'sheet'; // 'sheet' | 'admin' | 'table' | 'library'
-  let vttData = null;
-  let pollTimer = null;
-  let zoom = 1;
-  let pan = { x: 0, y: 0 };
-  let isPanning = false;
-  let panStart = { x: 0, y: 0 };
+  'use strict';
 
-  let tool = 'move'; // 'move' | 'reveal' | 'cover' | 'ruler'
-  let brushSize = 6;
-  let isPainting = false;
-  let pendingFogOps = [];
+  let KEY = sessionStorage.getItem('fk') || '';
+  let ME = null;
+  let DATA = [];
+  let cid = '';
+  let view = 'sheet'; // 'sheet' | 'admin'
 
-  let draggingToken = null;
-  let dragOrigin = null;
-  let dragLimitMeters = null;
-  let movedThisTurn = 0;
+  const V0 = n => ({ n, c: 0, m: 0 });
+  const D = {
+    name: '',
+    title: '',
+    motto: '',
+    notes: '',
+    mnotes: '',
+    lock: false,
+    attrs: [['Força', 0], ['Destreza', 0], ['Constituição', 0], ['Inteligência', 0], ['Presença', 0]],
+    hp: { n: 'Vida', c: 0, m: 0, x: 0 },
+    st: V0('Stamina'),
+    avatar: '',
+    banner: '',
+    bg: '',
+    skills: [],
+    items: []
+  };
 
-  let rulerOrigin = null;
-  let editingMapId = null;
-  let editingNpcId = null;
+  const TY = {
+    Arma: '#d1303c',
+    'Relíquia': '#d8b45a',
+    'Consumível': '#4fa36b',
+    'Munição': '#6f8fb8',
+    Outro: '#8a7f7c'
+  };
+  const TN = Object.keys(TY);
 
-  const getKey = () => sessionStorage.getItem('fk') || '';
+  function I(p, c) {
+    return '<svg class="ic' + (c ? ' ' + c : '') + '" viewBox="0 0 24 24" aria-hidden="true">' + p + '</svg>';
+  }
 
-  function vttApi(path, method = 'GET', body) {
-    return fetch('/api/vtt/' + path, {
+  const P = {
+    cross: '<path d="M12 2v20M5 8h14"/>',
+    drop: '<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11z"/>',
+    dag: '<path d="M12 2l3 11-3 3-3-3z"/><path d="M7 16h10M12 16v6"/>',
+    bul: '<path d="M9 21V10c0-4 1.5-6 3-7 1.5 1 3 3 3 7v11zM9 17h6"/>',
+    dia: '<path d="M12 3l8 9-8 9-4-4.5L4 12z"/>',
+    skull: '<path d="M12 3a8 8 0 0 0-8 8c0 3 1.5 4.5 3 5.5V20h10v-3.5c1.5-1 3-2.5 3-5.5a8 8 0 0 0-8-8z"/><circle cx="9" cy="11" r="1.8"/><circle cx="15" cy="11" r="1.8"/><path d="M12 14v2M10 20v-2M14 20v-2"/>',
+    heart: '<path d="M12 21s-8-5.5-8-11a4.5 4.5 0 0 1 8-2.5A4.5 4.5 0 0 1 20 10c0 5.5-8 11-8 11z"/>',
+    flame: '<path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4-1-6 1-10z"/>',
+    sig: '<circle cx="12" cy="12" r="9.5"/><path d="M12 3l5.3 16.3L3.4 9.2h17.2L6.7 19.3z"/>'
+  };
+
+  const TIC = { Arma: 'dag', 'Relíquia': 'cross', 'Consumível': 'drop', 'Munição': 'bul', Outro: 'dia' };
+  const VI = {
+    hp: [I(P.heart, 'ht'), 'Vida', ['Dano', 'Curar']],
+    st: [I(P.flame, 'fm'), 'Stamina', ['Gastar', 'Recuperar']]
+  };
+
+  function mod(v) {
+    v = +v || 0;
+    if (v <= 1) return v - 6;
+    if (v === 2) return -4;
+    if (v === 3) return -3;
+    if (v <= 5) return -2;
+    if (v <= 8) return -1;
+    if (v <= 12) return 0;
+    if (v <= 15) return 1;
+    if (v <= 17) return 2;
+    return v - 15;
+  }
+
+  function sg(n) {
+    return (n > 0 ? '+' : '') + n;
+  }
+
+  function modH(i, v) {
+    const m = mod(v);
+    return '<small class="mod ' + (m > 0 ? 'pos' : m < 0 ? 'neg' : '') + '" data-mod="' + i + '" title="Vantagem ou desvantagem do atributo">' + sg(m) + '</small>';
+  }
+
+  function cl(o) {
+    return JSON.parse(JSON.stringify(o));
+  }
+
+  function normalizeSheet(raw, fallbackName) {
+    const base = cl(D);
+    if (!raw || typeof raw !== 'object') {
+      base.name = fallbackName || '';
+      return base;
+    }
+    const merged = Object.assign(base, raw);
+    merged.hp = Object.assign(cl(D.hp), raw.hp || {});
+    merged.st = Object.assign(V0('Stamina'), raw.st || {});
+    merged.attrs = Array.isArray(raw.attrs) ? raw.attrs : cl(D.attrs);
+    merged.skills = Array.isArray(raw.skills) ? raw.skills : [];
+    merged.items = Array.isArray(raw.items) ? raw.items : [];
+    if (!merged.name && fallbackName) merged.name = fallbackName;
+    return merged;
+  }
+
+  let S = cl(D);
+  let oi = -1;
+  let fl = 'Tudo';
+  let pend = null;
+  let sure = 0;
+  let tt = 0;
+  let st0 = 0;
+  let booted = 0;
+  let savingState = 'Salvo na nuvem.';
+
+  const nv = document.getElementById('nv');
+  const app = document.getElementById('app');
+  const md = document.getElementById('md');
+  const pick = document.getElementById('pick');
+  const te = document.getElementById('toast');
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;'
+    }[c]));
+  }
+
+  function toast(m) {
+    te.textContent = m;
+    te.classList.add('on');
+    clearTimeout(tt);
+    tt = setTimeout(() => te.classList.remove('on'), 3000);
+  }
+
+  function imgOr(s, ic, a, c) {
+    return s ? '<img src="' + s + '" alt="' + esc(a) + '">' : I(P[ic], c);
+  }
+
+  // --- API CLOUDFLARE ---
+  function api(path, method = 'GET', body) {
+    return fetch('/api/' + path, {
       method,
-      headers: {
-        'content-type': 'application/json',
-        'x-key': getKey()
-      },
+      headers: { 'content-type': 'application/json', 'x-key': KEY },
       body: body === undefined ? undefined : JSON.stringify(body)
     }).then(async r => {
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.error || 'Erro na mesa virtual');
+      if (!r.ok) throw new Error(j.error || 'Erro na requisição');
       return j;
     });
   }
 
-  function esc(str) {
-    return String(str ?? '').replace(/[&<>"']/g, c => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[c]));
+  function updateSyncText(txt) {
+    savingState = txt;
+    const el = document.getElementById('sync-txt');
+    if (el) el.textContent = txt;
   }
 
-  function showToast(msg) {
-    const el = document.getElementById('toast');
-    if (!el) return;
-    el.textContent = msg;
-    el.classList.add('on');
-    clearTimeout(el._t);
-    el._t = setTimeout(() => el.classList.remove('on'), 2800);
+  function flush() {
+    clearTimeout(st0);
+    if (!ME || !cid) return;
+    updateSyncText('Salvando...');
+    api('sheet/' + cid, 'PUT', cl(S))
+      .then(() => updateSyncText('Salvo na nuvem.'))
+      .catch(err => {
+        updateSyncText('Erro ao salvar.');
+        toast(err.message);
+      });
   }
 
-  function parseSpeedMeters(speedStr) {
-    const num = parseFloat(String(speedStr || '9').replace(',', '.'));
-    return Number.isFinite(num) && num > 0 ? num : 9;
+  function save() {
+    clearTimeout(st0);
+    updateSyncText('Alterações pendentes...');
+    st0 = setTimeout(flush, 650);
   }
 
-  // Compressão automática de imagens (Mapas e Tokens) para salvar leve no Cloudflare KV
-  function pickAndCompressImage(options = {}) {
-    const { square = false, maxSize = 1400, quality = 0.78 } = options;
-    return new Promise(resolve => {
-      const input = document.getElementById('vtt-file-pick');
-      if (!input) return resolve('');
-      input.onchange = () => {
-        const file = input.files && input.files[0];
-        input.value = '';
-        if (!file) return resolve('');
-        const reader = new FileReader();
-        reader.onload = () => {
-          const img = new Image();
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            if (square) {
-              canvas.width = maxSize;
-              canvas.height = maxSize;
-              const side = Math.min(img.width, img.height);
-              const sx = (img.width - side) / 2;
-              const sy = (img.height - side) / 2;
-              ctx.drawImage(img, sx, sy, side, side, 0, 0, maxSize, maxSize);
-            } else {
-              const ratio = Math.min(1, maxSize / Math.max(img.width, img.height));
-              canvas.width = Math.round(img.width * ratio);
-              canvas.height = Math.round(img.height * ratio);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            }
-            resolve(canvas.toDataURL('image/jpeg', quality));
-          };
-          img.src = reader.result;
-        };
-        reader.readAsDataURL(file);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && st0) flush();
+  });
+
+  // --- COMPRESSÃO DE IMAGEM PARA KV ---
+  function compressImage(file, path, cb) {
+    const isBg = path === 'bg' || path === 'banner';
+    const maxW = isBg ? 960 : 280;
+    const maxH = isBg ? 540 : 280;
+
+    const r = new FileReader();
+    r.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const cv = document.createElement('canvas');
+        cv.width = w;
+        cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        cb(cv.toDataURL('image/jpeg', 0.82));
       };
-      input.click();
-    });
+      img.onerror = () => toast('Não foi possível processar essa imagem.');
+      img.src = r.result;
+    };
+    r.onerror = () => toast('Não foi possível ler essa imagem.');
+    r.readAsDataURL(file);
   }
 
-  // --- INTEGRAÇÃO AUTOMÁTICA COM A BARRA DE NAVEGAÇÃO (#nv) ---
-  function injectVttNavButtons() {
-    const nv = document.getElementById('nv');
-    if (!nv || nv.hidden || !nv.children.length) return;
-    if (nv.querySelector('[data-vtt-tab="table"]')) {
-      syncNavHighlight();
+  // --- AUTENTICAÇÃO & NAVEGAÇÃO ---
+  function boot() {
+    if (!KEY) {
+      renderLogin();
+      return;
+    }
+    api('me')
+      .then(m => {
+        ME = m;
+        loadAll();
+      })
+      .catch(() => {
+        ME = null;
+        KEY = '';
+        sessionStorage.removeItem('fk');
+        renderLogin('Código inválido ou acesso negado.');
+      });
+  }
+
+  function renderLogin(errMsg = '') {
+    nv.hidden = true;
+    app.innerHTML = `
+      <div class="login-wrap">
+        <section class="pn login-card rise">
+          <div style="margin-bottom:6px;">${I(P.skull, 'sw')}</div>
+          <h1 class="login-title">Entrar na Mesa</h1>
+          <p class="login-sub">Apresente seu código de acesso ou a chave do Santo Ofício.</p>
+          <form id="login-form">
+            <div class="login-field">
+              <input id="lk" type="password" placeholder="Código de acesso" required autocomplete="current-password">
+              <button type="button" class="pw-eye" id="btn-eye" title="Mostrar/Ocultar">👁️</button>
+            </div>
+            <button type="submit" class="bt" style="width:100%;">Abrir Grimório</button>
+          </form>
+          ${errMsg ? `<p style="color:#8f111c;font:.9rem var(--tp);margin:12px 0 0;">${esc(errMsg)}</p>` : ''}
+        </section>
+      </div>
+    `;
+
+    const inp = document.getElementById('lk');
+    inp.focus();
+
+    document.getElementById('btn-eye').onclick = () => {
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    };
+
+    document.getElementById('login-form').onsubmit = e => {
+      e.preventDefault();
+      const val = inp.value.trim();
+      if (!val) return;
+      KEY = val;
+      sessionStorage.setItem('fk', KEY);
+      boot();
+    };
+  }
+
+  function renderNav() {
+    if (!ME) {
+      nv.hidden = true;
+      return;
+    }
+    nv.hidden = false;
+    const isMaster = ME.role === 'master';
+
+    nv.innerHTML = `
+      <div class="topbar-group">
+        <span class="role-tag">${isMaster ? '👑 MESTRE' : '✝ ' + esc(ME.name || 'JOGADOR')}</span>
+        <button class="bt ${view === 'sheet' ? 'on' : ''}" data-act="go-sheet">
+          ${isMaster ? 'Fichas da Mesa' : 'Minha Ficha'}
+        </button>
+        ${isMaster ? `<button class="bt ${view === 'admin' ? 'on' : ''}" data-act="go-admin">Gerenciar Jogadores</button>` : ''}
+      </div>
+      <div class="topbar-group">
+        <button class="bt" data-act="logout">Sair</button>
+      </div>
+    `;
+  }
+
+  function loadAll() {
+    api('sheets')
+      .then(r => {
+        DATA = (r.players || []).map(p => ({
+          ...p,
+          sheet: normalizeSheet(p.sheet, p.name)
+        }));
+
+        if (DATA.length) {
+          if (!cid || !DATA.some(p => p.id === cid)) cid = DATA[0].id;
+          const active = DATA.find(p => p.id === cid);
+          S = active.sheet;
+        } else {
+          cid = '';
+          S = cl(D);
+        }
+
+        renderNav();
+        if (view === 'admin' && ME.role === 'master') renderAdmin();
+        else render();
+      })
+      .catch(err => toast(err.message));
+  }
+
+  // --- RENDERIZAÇÃO DA FICHA (O INQUISIDOR DO DESERTO) ---
+  function setPath(p, v) {
+    const k = p.split('.');
+    let o = S;
+    for (let i = 0; i < k.length - 1; i++) o = o[k[i]];
+    o[k[k.length - 1]] = v;
+  }
+
+  function vital(k, d) {
+    const v = S[k];
+    const hp = k === 'hp';
+    const L = v.n || VI[k][1];
+    const b = VI[k][2];
+    return (
+      '<section class="pn rise" data-v="' + k + '"' + d + '>' +
+        '<h2>' + VI[k][0] + '<input class="vn" data-set="' + k + '.n" value="' + esc(L) + '" aria-label="Nome da barra"></h2>' +
+        '<div class="nums">' +
+          '<input type="number" min="0" data-set="' + k + '.c" value="' + v.c + '" aria-label="' + esc(L) + ' atual">' +
+          '<span>/</span>' +
+          '<input type="number" min="0" data-set="' + k + '.m" value="' + v.m + '" aria-label="' + esc(L) + ' máxima">' +
+        '</div>' +
+        (hp ? '<svg class="ecg" viewBox="0 0 120 24" preserveAspectRatio="none" aria-hidden="true"><polyline points="0,12 30,12 36,12 40,3 46,21 51,12 80,12 86,8 90,12 120,12"/></svg>' : '') +
+        '<div class="bar b1"><i></i></div>' +
+        (hp ? '<div class="xr"><label>Vida extra <input type="number" min="0" data-set="hp.x" value="' + (v.x || 0) + '"></label></div><div class="bar b2"><i></i></div>' : '') +
+        '<div class="ctl">' +
+          '<input type="number" min="1" value="1" data-amt="' + k + '" aria-label="Valor">' +
+          '<button class="bt" data-act="dmg" data-k="' + k + '">' + b[0] + '</button>' +
+          '<button class="bt" data-act="heal" data-k="' + k + '">' + b[1] + '</button>' +
+          (hp ? '<button class="bt" data-act="xtra">+ Extra</button>' : '') +
+        '</div>' +
+        (v.m > 0 ? '' : '<p class="hint mu">Defina o máximo primeiro.</p>') +
+      '</section>'
+    );
+  }
+
+  function paint(k) {
+    const s = document.querySelector('[data-v="' + k + '"]');
+    if (!s) return;
+    const v = S[k];
+    const m = v.m > 0 ? v.m : 0;
+    s.querySelector('.b1 i').style.width = (m ? Math.min(100, (v.c / m) * 100) : 0) + '%';
+    const b = s.querySelector('.b2 i');
+    if (b) b.style.width = (m ? Math.min(100, ((v.x || 0) / m) * 100) : 0) + '%';
+    s.classList.toggle('low', m > 0 && v.c / m <= 0.3);
+  }
+
+  function sync(k) {
+    const v = S[k];
+    ['c', 'm', 'x'].forEach(f => {
+      const e = document.querySelector('[data-set="' + k + '.' + f + '"]');
+      if (e && v[f] !== undefined && +e.value !== v[f]) e.value = v[f];
+    });
+    paint(k);
+    save();
+  }
+
+  function fix(k) {
+    const v = S[k];
+    v.m = Math.max(0, v.m || 0);
+    v.c = Math.max(0, Math.min(v.c || 0, v.m));
+    if (k === 'hp') v.x = Math.max(0, v.x || 0);
+    sync(k);
+  }
+
+  function amt(k) {
+    const e = document.querySelector('[data-amt="' + k + '"]');
+    return Math.max(1, parseInt(e && e.value) || 1);
+  }
+
+  function render() {
+    const isMaster = ME && ME.role === 'master';
+
+    if (!DATA.length) {
+      app.innerHTML = `
+        <section class="pn pn-paper rise" style="grid-column:1/-1;text-align:center;padding:36px 20px;">
+          <h2 style="justify-content:center;">Nenhum Jogador Cadastrado</h2>
+          <p class="mu">${isMaster ? 'Cadastre os jogadores e seus códigos de acesso para abrir as fichas da mesa.' : 'Aguarde o Mestre cadastrar sua ficha.'}</p>
+          ${isMaster ? '<button class="bt" data-act="go-admin">Cadastrar Jogadores</button>' : ''}
+        </section>
+      `;
       return;
     }
 
-    const isMaster = !!nv.querySelector('[data-nav="admin"]');
-    const logoutBtn = nv.querySelector('[data-nav="logout"]');
+    const isLocked = !isMaster && !!S.lock;
+    let n = 0;
+    const d = () => ' style="--d:' + (0.05 + n++ * 0.06).toFixed(2) + 's"';
 
-    const btnTable = document.createElement('button');
-    btnTable.className = 'bt';
-    btnTable.dataset.vttTab = 'table';
-    btnTable.textContent = '🗺️ Mesa (Mapa)';
-    btnTable.onclick = () => openVttTab('table');
+    document.getElementById('bgi').style.backgroundImage = S.bg ? 'url("' + S.bg + '")' : '';
 
-    nv.insertBefore(btnTable, logoutBtn || null);
+    const masterStrip = isMaster
+      ? '<div class="master-strip">' +
+          '<div class="player-tabs">' +
+            DATA.map(p =>
+              '<button class="bt ' + (p.id === cid ? 'on' : '') + '" data-act="sel-player" data-id="' + p.id + '">' +
+                esc(p.sheet.name || p.name) +
+              '</button>'
+            ).join('') +
+          '</div>' +
+          '<button class="bt ' + (S.lock ? 'sure' : '') + '" data-act="toggle-lock">' +
+            (S.lock ? '🔒 Atributos Travados' : '🔓 Travar Atributos') +
+          '</button>' +
+        '</div>'
+      : '';
 
-    if (isMaster) {
-      const btnLib = document.createElement('button');
-      btnLib.className = 'bt';
-      btnLib.dataset.vttTab = 'library';
-      btnLib.textContent = '📚 Mapas & NPCs';
-      btnLib.onclick = () => openVttTab('library');
-      nv.insertBefore(btnLib, logoutBtn || null);
-    }
+    const hero =
+      '<header class="pn hd rise"' + d() + '>' +
+        '<div class="av" data-act="img" data-p="avatar" role="button" tabindex="0" aria-label="Trocar retrato">' +
+          imgOr(S.avatar, 'skull', 'Retrato', 'sw') +
+          '<span class="ov">Trocar imagem</span>' +
+        '</div>' +
+        '<div class="hi">' +
+          '<input class="nm" data-set="name" value="' + esc(S.name) + '" placeholder="Nome do personagem" aria-label="Nome">' +
+          '<div class="sub"><input data-set="title" value="' + esc(S.title) + '" placeholder="Ocupação, classe ou título" aria-label="Título"></div>' +
+          '<div class="mt"><span>“</span><input data-set="motto" value="' + esc(S.motto) + '" placeholder="Uma frase que o define" aria-label="Frase"><span>”</span></div>' +
+        '</div>' +
+      '</header>';
 
-    // Quando clicar nas abas nativas (Fichas / Gerenciar Jogadores), sai do modo VTT
-    nv.querySelectorAll('[data-nav]').forEach(btn => {
-      if (btn.dataset.vttHooked) return;
-      btn.dataset.vttHooked = '1';
-      btn.addEventListener('click', () => {
-        activeTab = btn.dataset.nav;
-        stopPolling();
-        const wrap = document.getElementById('app');
-        if (wrap) wrap.classList.remove('vtt-wide');
-        syncNavHighlight();
-      });
-    });
+    const ban =
+      '<section class="pn bn rise"' + d() + ' data-act="img" data-p="banner" role="button" tabindex="0" aria-label="Trocar banner">' +
+        (S.banner ? '<img src="' + S.banner + '" alt="">' : '<div class="ph"><div>Clique para adicionar um banner<br><small>png, jpg ou gif</small></div></div>') +
+        '<span class="ov">Trocar banner</span>' +
+      '</section>';
 
-    syncNavHighlight();
-  }
+    const tabs = ['Tudo'].concat(TN).map(t =>
+      '<button class="' + (fl === t ? 'on' : '') + '" data-act="fl" data-t="' + t + '">' + t + '</button>'
+    ).join('');
 
-  function syncNavHighlight() {
-    const nv = document.getElementById('nv');
-    if (!nv) return;
-    const isVtt = activeTab === 'table' || activeTab === 'library';
-    if (isVtt) {
-      nv.querySelectorAll('[data-nav]').forEach(b => b.classList.remove('on'));
-    }
-    nv.querySelectorAll('[data-vtt-tab]').forEach(b => {
-      b.classList.toggle('on', b.dataset.vttTab === activeTab);
-    });
-  }
-
-  function openVttTab(tab) {
-    activeTab = tab;
-    syncNavHighlight();
-    const wrap = document.getElementById('app');
-    if (wrap) wrap.classList.add('vtt-wide');
-    refreshVttState(true);
-    startPolling();
-  }
-
-  function startPolling() {
-    stopPolling();
-    pollTimer = setInterval(() => {
-      if (activeTab !== 'table') return;
-      if (draggingToken || isPainting || isPanning) return;
-      const focused = document.activeElement;
-      if (focused && ['INPUT', 'TEXTAREA', 'SELECT'].includes(focused.tagName)) return;
-      refreshVttState(false);
-    }, 3500);
-  }
-
-  function stopPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-  }
-
-  function refreshVttState(forceRender = false) {
-    vttApi('state')
-      .then(data => {
-        vttData = data;
-        if (activeTab === 'table') {
-          if (forceRender || !document.getElementById('vtt-stage')) {
-            renderTableView();
-          } else {
-            updateLiveBoard();
-          }
-        } else if (activeTab === 'library') {
-          renderLibraryView();
-        }
-      })
-      .catch(err => showToast(err.message));
-  }
-
-  // =========================================================================
-  // ABA 1: MESA VIRTUAL (TABLETOP)
-  // =========================================================================
-  function renderTableView() {
-    const app = document.getElementById('app');
-    if (!app || !vttData) return;
-
-    const { isMaster, map, roster, library } = vttData;
-    const savedMaps = (library && library.maps) || [];
-    const savedNpcs = (library && library.npcs) || [];
-
-    const myRoster = roster.find(r => r.id === vttData.me.id);
-    const maxMove = myRoster ? parseSpeedMeters(myRoster.speed) : 9;
-    const remMove = Math.max(0, maxMove - movedThisTurn);
-
-    app.innerHTML = `
-      <div class="vtt-workbench">
-        <!-- COLUNA PRINCIPAL: MAPA -->
-        <section class="vtt-board-card">
-          <div class="vtt-toolbar">
-            <div class="vtt-tool-group">
-              <span class="vtt-scene-title">🗺️ ${esc(map.name || 'Mesa')}</span>
-              ${isMaster ? `
-                <select class="vtt-select" id="vtt-quick-map" title="Trocar Cena Rápida">
-                  <option value="">-- Trocar Mapa Salvo --</option>
-                  ${savedMaps.map(m => `<option value="${esc(m.id)}" ${m.id === map.mapId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}
-                </select>
-              ` : ''}
-            </div>
-
-            <div class="vtt-tool-group">
-              <button class="vtt-btn ${tool === 'move' ? 'active' : ''}" data-tool="move">✋ Mover</button>
-              <button class="vtt-btn ${tool === 'ruler' ? 'active' : ''}" data-tool="ruler">📏 Régua</button>
-              ${isMaster ? `
-                <button class="vtt-btn ${tool === 'reveal' ? 'active' : ''}" data-tool="reveal">👁️ Revelar</button>
-                <button class="vtt-btn ${tool === 'cover' ? 'active' : ''}" data-tool="cover">🌑 Cobrir</button>
-                <select class="vtt-select" id="vtt-brush-size" title="Tamanho do Pincel">
-                  <option value="3" ${brushSize === 3 ? 'selected' : ''}>Pincel P</option>
-                  <option value="6" ${brushSize === 6 ? 'selected' : ''}>Pincel M</option>
-                  <option value="12" ${brushSize === 12 ? 'selected' : ''}>Pincel G</option>
-                </select>
-                <button class="vtt-btn" id="vtt-fog-cover-all" title="Cobrir todo o mapa com névoa">Cobrir Tudo</button>
-                <button class="vtt-btn" id="vtt-fog-reveal-all" title="Remover névoa">Revelar Tudo</button>
-              ` : `
-                <span class="vtt-btn" style="cursor:default;">Passo: <strong>${remMove.toFixed(1)}m</strong> / ${maxMove.toFixed(1)}m</span>
-                <button class="vtt-btn gold" id="vtt-reset-turn">↻ Novo Turno</button>
-              `}
-              <button class="vtt-btn" id="vtt-zoom-out" title="Diminuir Zoom">−</button>
-              <button class="vtt-btn" id="vtt-zoom-reset" title="Resetar Câmera">100%</button>
-              <button class="vtt-btn" id="vtt-zoom-in" title="Aumentar Zoom">+</button>
-            </div>
-          </div>
-
-          <div class="vtt-viewport" id="vtt-viewport">
-            <div class="vtt-pan-layer" id="vtt-pan-layer" style="transform: translate(${pan.x}px, ${pan.y}px) scale(${zoom});">
-              <div class="vtt-stage" id="vtt-stage">
-                ${map.bg
-                  ? `<img id="vtt-bg-img" src="${esc(map.bg)}" alt="Mapa">`
-                  : `<div class="vtt-empty-map">
-                      <strong>Nenhum mapa carregado na mesa</strong>
-                      <span>${isMaster ? 'Vá na aba "📚 Mapas & NPCs" para cadastrar mapas ou cole uma imagem abaixo.' : 'Aguarde o Mestre ativar o mapa da cena.'}</span>
-                    </div>`
-                }
-                <div class="vtt-grid-layer" id="vtt-grid"></div>
-                <div class="vtt-tokens-layer" id="vtt-tokens"></div>
-                <canvas id="vtt-fog-canvas" class="${isMaster && (tool === 'reveal' || tool === 'cover') ? 'painting' : ''}"></canvas>
-                <svg class="vtt-ruler-layer" id="vtt-ruler"></svg>
-                <div class="vtt-brush-cursor" id="vtt-brush"></div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- BARRA LATERAL: ELENCO NA MESA (PÔR / TIRAR PLAYERS E NPCS) -->
-        <aside class="vtt-sidebar">
-          <!-- JOGADORES -->
-          <div class="vtt-side-box">
-            <h3 class="vtt-side-title">
-              <span>🗡️ Jogadores na Mesa</span>
-              <span>${roster.filter(r => map.tokens.some(t => t.kind === 'player' && t.owner === r.id)).length}/${roster.length}</span>
-            </h3>
-
-            <div class="vtt-roster-list">
-              ${roster.length ? roster.map(p => {
-                const onBoard = map.tokens.some(t => t.kind === 'player' && t.owner === p.id);
-                return `
-                  <div class="vtt-roster-item">
-                    <div class="vtt-roster-info">
-                      <div class="vtt-mini-avatar">
-                        ${p.avatar ? `<img src="${esc(p.avatar)}" alt="">` : esc((p.charName || '?').slice(0, 2).toUpperCase())}
-                      </div>
-                      <div class="vtt-roster-meta">
-                        <span class="vtt-roster-name">${esc(p.charName)}</span>
-                        <span class="vtt-roster-sub">HP ${p.hp}/${p.mhp} · ${esc(p.speed)}</span>
-                      </div>
-                    </div>
-
-                    ${isMaster ? `
-                      <button class="vtt-toggle-seat ${onBoard ? 'in' : 'out'}" data-seat-player="${esc(p.id)}" data-on-board="${onBoard ? '1' : '0'}">
-                        ${onBoard ? '− Tirar' : '+ Pôr'}
-                      </button>
-                    ` : `
-                      <span class="vtt-roster-sub">${onBoard ? '🟢 Na Mesa' : '⚪ Fora'}</span>
-                    `}
-                  </div>
-                `;
-              }).join('') : `<p style="font-size:0.82rem; margin:0;">Nenhum jogador cadastrado.</p>`}
-            </div>
-          </div>
-
-          <!-- INVOCAR NPCS & TOKENS ATIVOS (MESTRE) -->
-          ${isMaster ? `
-            <div class="vtt-side-box">
-              <h3 class="vtt-side-title">
-                <span>👹 Invocar NPC / Inimigo</span>
-                <button class="vtt-btn" id="vtt-goto-lib" style="padding:2px 7px; font-size:0.7rem;">+ Criar</button>
-              </h3>
-
-              ${savedNpcs.length ? `
-                <div style="display:flex; gap:6px; margin-bottom:10px;">
-                  <select class="vtt-field" id="vtt-npc-select">
-                    ${savedNpcs.map(n => `<option value="${esc(n.id)}">${esc(n.name)} (HP ${n.hp} · CA ${n.ac})</option>`).join('')}
-                  </select>
-                  <button class="vtt-btn gold" id="vtt-spawn-npc-btn">Invocar</button>
-                </div>
-              ` : `<p style="font-size:0.8rem; margin:0 0 8px 0;">Cadastre NPCs na aba <strong>Mapas &amp; NPCs</strong> para invocá-los aqui.</p>`}
-
-              <div class="vtt-side-title" style="margin-top:8px;">
-                <span>Tokens Ativos (${map.tokens.length})</span>
-                ${map.tokens.some(t => t.kind === 'npc') ? `<button class="vtt-btn danger" id="vtt-clear-npcs" style="padding:2px 6px; font-size:0.68rem;">Limpar NPCs</button>` : ''}
-              </div>
-
-              <div class="vtt-roster-list" style="max-height:260px; overflow-y:auto;">
-                ${map.tokens.length ? map.tokens.map(tok => `
-                  <div class="vtt-roster-item">
-                    <div class="vtt-roster-info">
-                      <div class="vtt-mini-avatar" style="border-color:${esc(tok.color || '#c89d54')};">
-                        ${tok.avatar ? `<img src="${esc(tok.avatar)}" alt="">` : esc((tok.name || '?').slice(0, 2).toUpperCase())}
-                      </div>
-                      <div class="vtt-roster-meta">
-                        <span class="vtt-roster-name">${esc(tok.name)}</span>
-                        <span class="vtt-roster-sub">${tok.kind === 'player' ? 'Jogador' : `HP ${tok.hp}/${tok.mhp}`}</span>
-                      </div>
-                    </div>
-                    <div style="display:flex; gap:4px;">
-                      <button class="vtt-btn" data-edit-tok-img="${esc(tok.id)}" title="Trocar imagem do token" style="padding:4px 6px;">🖼️</button>
-                      <button class="vtt-btn danger" data-remove-tok="${esc(tok.id)}" title="Tirar da mesa" style="padding:4px 7px;">×</button>
-                    </div>
-                  </div>
-                `).join('') : `<p style="font-size:0.8rem; margin:0;">Nenhum token no mapa.</p>`}
-              </div>
-            </div>
-          ` : ''}
-        </aside>
-      </div>
-    `;
-
-    const bgImg = document.getElementById('vtt-bg-img');
-    if (bgImg) {
-      bgImg.onload = () => updateLiveBoard();
-    }
-    updateLiveBoard();
-    bindTableEvents();
-  }
-
-  function updateLiveBoard() {
-    if (!vttData) return;
-    const stage = document.getElementById('vtt-stage');
-    const gridEl = document.getElementById('vtt-grid');
-    const tokensEl = document.getElementById('vtt-tokens');
-    const fogCanvas = document.getElementById('vtt-fog-canvas');
-    if (!stage || !gridEl || !tokensEl || !fogCanvas) return;
-
-    const { isMaster, map, me } = vttData;
-    const w = stage.clientWidth;
-    const h = stage.clientHeight;
-    if (!w || !h) return;
-
-    // 1. Grid
-    if (map.grid > 0) {
-      const cellPx = w / map.grid;
-      gridEl.style.backgroundImage = `
-        linear-gradient(rgba(255, 240, 210, 0.16) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 240, 210, 0.16) 1px, transparent 1px)
-      `;
-      gridEl.style.backgroundSize = `${cellPx}px ${cellPx}px`;
-    } else {
-      gridEl.style.backgroundImage = 'none';
-    }
-
-    // 2. Tokens
-    const baseCellPx = map.grid > 0 ? w / map.grid : Math.max(36, w / 22);
-    tokensEl.innerHTML = (map.tokens || []).map(tok => {
-      const canMove = isMaster || tok.owner === me.id;
-      const isMine = tok.owner === me.id;
-      const sizePx = Math.max(30, baseCellPx * (tok.size || 1) * 0.88);
-      const hpPct = tok.mhp > 0 ? Math.max(0, Math.min(100, (tok.hp / tok.mhp) * 100)) : 100;
-
-      return `
-        <div class="vtt-token ${canMove ? 'movable' : ''} ${isMine ? 'mine' : ''}"
-             data-token-id="${esc(tok.id)}"
-             style="left:${tok.x}%; top:${tok.y}%; width:${sizePx}px; height:${sizePx}px; border-color:${esc(tok.color || '#c89d54')};">
-          ${tok.avatar
-            ? `<img src="${esc(tok.avatar)}" alt="${esc(tok.name)}">`
-            : `<span class="vtt-token-initials">${esc((tok.name || '?').slice(0, 2).toUpperCase())}</span>`
-          }
-          ${tok.mhp > 0 ? `<span class="vtt-token-hp"><i style="width:${hpPct}%;"></i></span>` : ''}
-          <span class="vtt-token-tag">${esc(tok.name)}</span>
-        </div>
-      `;
+    const tiles = S.items.map((s, i) => {
+      if (fl !== 'Tudo' && s.t !== fl) return '';
+      return (
+        '<button class="tile pop' + (+s.q <= 0 ? ' z' : '') + '" style="--tc:' + (TY[s.t] || TY.Outro) + ';--d:' + (i * 0.04).toFixed(2) + 's" data-act="open" data-i="' + i + '">' +
+          '<span class="im">' + imgOr(s.img, TIC[s.t] || 'dia', s.n) + (s.dm ? '<b class="dm">' + esc(s.dm) + '</b>' : '') + '</span>' +
+          (+s.q !== 1 ? '<b class="q">×' + (+s.q || 0) + '</b>' : '') +
+          '<span class="tn">' + esc(s.n || 'Sem nome') + '</span>' +
+        '</button>'
+      );
     }).join('');
 
-    // 3. Névoa de Guerra
-    fogCanvas.width = w;
-    fogCanvas.height = h;
-    fogCanvas.classList.toggle('painting', isMaster && (tool === 'reveal' || tool === 'cover'));
-    const fogOn = Boolean(map.fog && map.fog.on);
-    fogCanvas.style.display = fogOn ? 'block' : 'none';
-    fogCanvas.style.opacity = isMaster ? '0.52' : '1';
+    const inv =
+      '<section class="pn pn-wood rise"' + d() + '>' +
+        '<h2>' + I(P.cross, 'gw') + 'Inventário <small>' + S.items.length + '</small></h2>' +
+        '<div class="tabs">' + tabs + '</div>' +
+        '<div class="ig">' + tiles + '<button class="tile add" data-act="addItem" style="--tc:#7a5a58"><span class="im">+</span><span class="tn">Novo item</span></button></div>' +
+      '</section>';
 
-    if (fogOn) {
-      const ctx = fogCanvas.getContext('2d');
-      ctx.clearRect(0, 0, w, h);
-      ctx.fillStyle = '#070505';
-      ctx.fillRect(0, 0, w, h);
+    const K = S.skills.length
+      ? S.skills.map((s, i) =>
+          '<div class="sk">' +
+            '<div class="si" data-act="img" data-p="skills.' + i + '.img" role="button" tabindex="0" aria-label="Trocar ícone">' + imgOr(s.img, 'sig', s.n, 'sg') + '</div>' +
+            '<div class="sb">' +
+              '<div class="r2">' +
+                '<input data-set="skills.' + i + '.n" value="' + esc(s.n) + '" placeholder="Nome da habilidade" aria-label="Nome">' +
+                '<input data-set="skills.' + i + '.dm" value="' + esc(s.dm) + '" placeholder="Dano" aria-label="Dano">' +
+              '</div>' +
+              '<textarea rows="2" data-set="skills.' + i + '.d" placeholder="O que faz e como funciona" aria-label="Descrição">' + esc(s.d) + '</textarea>' +
+            '</div>' +
+            '<div class="sr">' +
+              '<label class="cs">Custo <input type="number" min="0" data-set="skills.' + i + '.c" value="' + (s.c || 0) + '" aria-label="Custo"></label>' +
+              '<button class="bt" data-act="use" data-i="' + i + '">Usar</button>' +
+              '<button class="bt x" data-act="delSk" data-i="' + i + '" aria-label="Remover habilidade">×</button>' +
+            '</div>' +
+          '</div>'
+        ).join('')
+      : '<p class="mu">Nenhuma habilidade ainda.</p>';
 
-      (map.fog.ops || []).forEach(([xPct, yPct, rPct, rev]) => {
-        ctx.globalCompositeOperation = rev ? 'destination-out' : 'source-over';
-        ctx.beginPath();
-        ctx.arc((xPct / 100) * w, (yPct / 100) * h, (rPct / 100) * w, 0, Math.PI * 2);
-        ctx.fill();
-      });
+    const sk =
+      '<section class="pn pn-paper rise"' + d() + '>' +
+        '<h2>' + I(P.sig, 'sg') + 'Habilidades</h2>' +
+        K +
+        '<p><button class="bt" data-act="addSk">Nova habilidade</button></p>' +
+      '</section>';
+
+    const side =
+      '<aside class="col">' +
+        '<section class="pn rise"' + d() + '>' +
+          '<h2>' + I(P.skull, 'sw') + 'Atributos' + (S.lock ? ' <small>🔒</small>' : '') + '</h2>' +
+          S.attrs.map((a, i) =>
+            '<div class="at">' +
+              '<input class="an" data-set="attrs.' + i + '.0" value="' + esc(a[0]) + '" aria-label="Nome do atributo"' + (isLocked ? ' disabled' : '') + '>' +
+              modH(i, a[1]) +
+              '<input class="vl" type="number" data-set="attrs.' + i + '.1" value="' + a[1] + '" aria-label="' + esc(a[0]) + '"' + (isLocked ? ' disabled' : '') + '>' +
+              (isLocked ? '' : '<button class="bt x" data-act="delAt" data-i="' + i + '" aria-label="Remover atributo">×</button>') +
+            '</div>'
+          ).join('') +
+          '<p class="hint mu">O número ao lado de cada atributo é a vantagem (+) ou a desvantagem (−) que ele dá.</p>' +
+          (isLocked ? '' : '<p><button class="bt" data-act="addAt">Novo atributo</button></p>') +
+        '</section>' +
+        '<section class="pn pn-paper rise"' + d() + '>' +
+          '<h2>' + I(P.drop, 'gw') + 'Anotações</h2>' +
+          '<textarea rows="9" data-set="notes" placeholder="Escreva o que quiser aqui." aria-label="Anotações">' + esc(S.notes) + '</textarea>' +
+        '</section>' +
+        (isMaster
+          ? '<section class="pn rise"' + d() + '>' +
+              '<h2>' + I(P.cross, 'gw') + 'Notas do Mestre</h2>' +
+              '<textarea rows="5" data-set="mnotes" placeholder="Segredos ocultos do jogador..." aria-label="Notas do Mestre">' + esc(S.mnotes) + '</textarea>' +
+            '</section>'
+          : '') +
+      '</aside>';
+
+    const ft =
+      '<footer class="ft mu">' +
+        '<button class="bt" data-act="img" data-p="bg">Plano de fundo</button>' +
+        (S.bg ? '<button class="bt" data-act="rmBg">Remover fundo</button>' : '') +
+        '<button class="bt' + (sure ? ' sure' : '') + '" data-act="reset">' + (sure ? 'Confirmar: apagar tudo' : 'Limpar ficha') + '</button>' +
+        '<button class="bt" data-act="save-now">Salvar agora</button>' +
+        '<span id="sync-txt">' + esc(savingState) + '</span>' +
+      '</footer>';
+
+    app.innerHTML = masterStrip + '<div class="col">' + hero + ban + '<div class="vts">' + vital('hp', d()) + vital('st', d()) + '</div>' + inv + sk + '</div>' + side + ft;
+
+    setTimeout(() => {
+      paint('hp');
+      paint('st');
+    }, booted ? 0 : 350);
+
+    if (!booted) {
+      booted = 1;
+      setTimeout(() => app.classList.add('booted'), 1600);
     }
   }
 
-  function clientToStagePercent(clientX, clientY) {
-    const stage = document.getElementById('vtt-stage');
-    const rect = stage.getBoundingClientRect();
-    return {
-      x: Math.max(1, Math.min(99, ((clientX - rect.left) / rect.width) * 100)),
-      y: Math.max(1, Math.min(99, ((clientY - rect.top) / rect.height) * 100))
-    };
-  }
-
-  function calcMeters(p1, p2) {
-    const stage = document.getElementById('vtt-stage');
-    const map = vttData.map;
-    if (!stage || !map.grid) return 0;
-    const ratio = stage.clientHeight / stage.clientWidth;
-    const dx = ((p2.x - p1.x) / 100) * map.grid;
-    const dy = ((p2.y - p1.y) / 100) * map.grid * ratio;
-    return Math.hypot(dx, dy) * (map.cellMeters || 1.5);
-  }
-
-  function drawRuler(origin, target, limitMeters) {
-    const stage = document.getElementById('vtt-stage');
-    const ruler = document.getElementById('vtt-ruler');
-    if (!stage || !ruler) return;
-
-    const w = stage.clientWidth;
-    const h = stage.clientHeight;
-    const x1 = (origin.x / 100) * w;
-    const y1 = (origin.y / 100) * h;
-    const x2 = (target.x / 100) * w;
-    const y2 = (target.y / 100) * h;
-    const dist = calcMeters(origin, target);
-
-    let circle = '';
-    if (limitMeters !== null && vttData.map.grid > 0) {
-      const rPx = (limitMeters / (vttData.map.cellMeters || 1.5)) * (w / vttData.map.grid);
-      circle = `<circle cx="${x1}" cy="${y1}" r="${rPx}" fill="rgba(232,194,118,0.1)" stroke="#e8c276" stroke-width="2" stroke-dasharray="6 4"/>`;
-    }
-
-    const label = limitMeters !== null ? `${dist.toFixed(1)}m / ${limitMeters.toFixed(1)}m` : `${dist.toFixed(1)}m`;
-    ruler.setAttribute('width', w);
-    ruler.setAttribute('height', h);
-    ruler.innerHTML = `
-      ${circle}
-      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#f2cf7e" stroke-width="3"/>
-      <text x="${x2 + 12}" y="${y2 - 12}" fill="#fff3d6" font-size="13" font-weight="bold" stroke="#000" stroke-width="3" paint-order="stroke">${label}</text>
-    `;
-  }
-
-  function clearRuler() {
-    const ruler = document.getElementById('vtt-ruler');
-    if (ruler) ruler.innerHTML = '';
-  }
-
-  function bindTableEvents() {
-    const app = document.getElementById('app');
-    const viewport = document.getElementById('vtt-viewport');
-    const panLayer = document.getElementById('vtt-pan-layer');
-    const tokensLayer = document.getElementById('vtt-tokens');
-    const fogCanvas = document.getElementById('vtt-fog-canvas');
-    const brushEl = document.getElementById('vtt-brush');
-
-    // Ferramentas
-    app.querySelectorAll('[data-tool]').forEach(btn => {
-      btn.onclick = () => {
-        tool = btn.dataset.tool;
-        renderTableView();
-      };
-    });
-
-    const brushSel = document.getElementById('vtt-brush-size');
-    if (brushSel) {
-      brushSel.onchange = () => { brushSize = Number(brushSel.value) || 6; };
-    }
-
-    // Troca rápida de mapa
-    const quickMap = document.getElementById('vtt-quick-map');
-    if (quickMap) {
-      quickMap.onchange = () => {
-        const chosen = (vttData.library?.maps || []).find(m => m.id === quickMap.value);
-        if (!chosen) return;
-        vttApi('table', 'POST', { op: 'activate_map', map: chosen, keepTokens: true })
-          .then(() => {
-            showToast(`Mapa "${chosen.name}" ativado!`);
-            refreshVttState(true);
-          })
-          .catch(err => showToast(err.message));
-      };
-    }
-
-    // Controles de Névoa
-    const btnCoverAll = document.getElementById('vtt-fog-cover-all');
-    if (btnCoverAll) {
-      btnCoverAll.onclick = () => {
-        vttApi('fog', 'POST', { op: 'cover_all' }).then(() => refreshVttState(true));
-      };
-    }
-
-    const btnRevealAll = document.getElementById('vtt-fog-reveal-all');
-    if (btnRevealAll) {
-      btnRevealAll.onclick = () => {
-        vttApi('fog', 'POST', { op: 'reveal_all' }).then(() => refreshVttState(true));
-      };
-    }
-
-    // Resetar turno (Jogador)
-    const btnResetTurn = document.getElementById('vtt-reset-turn');
-    if (btnResetTurn) {
-      btnResetTurn.onclick = () => {
-        movedThisTurn = 0;
-        renderTableView();
-        showToast('Deslocamento restaurado para o novo turno!');
-      };
-    }
-
-    // Zoom & Câmera
-    const applyCamera = () => {
-      if (panLayer) panLayer.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
-    };
-    const zIn = document.getElementById('vtt-zoom-in');
-    const zOut = document.getElementById('vtt-zoom-out');
-    const zReset = document.getElementById('vtt-zoom-reset');
-    if (zIn) zIn.onclick = () => { zoom = Math.min(2.6, zoom + 0.2); applyCamera(); };
-    if (zOut) zOut.onclick = () => { zoom = Math.max(0.5, zoom - 0.2); applyCamera(); };
-    if (zReset) zReset.onclick = () => { zoom = 1; pan = { x: 0, y: 0 }; applyCamera(); };
-
-    // Pôr / Tirar Jogador da Mesa (1 clique)
-    app.querySelectorAll('[data-seat-player]').forEach(btn => {
-      btn.onclick = () => {
-        const playerId = btn.dataset.seatPlayer;
-        const isOn = btn.dataset.onBoard === '1';
-        vttApi('table', 'POST', { op: isOn ? 'remove_player' : 'put_player', playerId })
-          .then(() => {
-            showToast(isOn ? 'Jogador retirado da mesa.' : 'Jogador colocado na mesa!');
-            refreshVttState(true);
-          })
-          .catch(err => showToast(err.message));
-      };
-    });
-
-    // Invocar NPC na Mesa
-    const btnSpawnNpc = document.getElementById('vtt-spawn-npc-btn');
-    if (btnSpawnNpc) {
-      btnSpawnNpc.onclick = () => {
-        const sel = document.getElementById('vtt-npc-select');
-        const npc = (vttData.library?.npcs || []).find(n => n.id === sel.value);
-        if (!npc) return;
-        vttApi('table', 'POST', { op: 'spawn_npc', npc })
-          .then(() => {
-            showToast(`${npc.name} invocado na mesa!`);
-            refreshVttState(true);
-          })
-          .catch(err => showToast(err.message));
-      };
-    }
-
-    // Ir para aba Mapas & NPCs
-    const btnGotoLib = document.getElementById('vtt-goto-lib');
-    if (btnGotoLib) btnGotoLib.onclick = () => openVttTab('library');
-
-    // Remover Token individual
-    app.querySelectorAll('[data-remove-tok]').forEach(btn => {
-      btn.onclick = () => {
-        vttApi('table', 'POST', { op: 'remove_token', id: btn.dataset.removeTok })
-          .then(() => refreshVttState(true))
-          .catch(err => showToast(err.message));
-      };
-    });
-
-    // Personalizar foto de um Token ativo na mesa
-    app.querySelectorAll('[data-edit-tok-img]').forEach(btn => {
-      btn.onclick = async () => {
-        const id = btn.dataset.editTokImg;
-        const dataUrl = await pickAndCompressImage({ square: true, maxSize: 200, quality: 0.82 });
-        if (!dataUrl) return;
-        vttApi('table', 'POST', { op: 'update_token', id, avatar: dataUrl })
-          .then(() => {
-            showToast('Imagem do token atualizada!');
-            refreshVttState(true);
-          })
-          .catch(err => showToast(err.message));
-      };
-    });
-
-    // Limpar NPCs
-    const btnClearNpcs = document.getElementById('vtt-clear-npcs');
-    if (btnClearNpcs) {
-      btnClearNpcs.onclick = () => {
-        vttApi('table', 'POST', { op: 'clear_npcs' })
-          .then(() => {
-            showToast('NPCs removidos da mesa.');
-            refreshVttState(true);
-          });
-      };
-    }
-
-    // Arrastar Tokens
-    if (tokensLayer) {
-      tokensLayer.onpointerdown = e => {
-        if (tool !== 'move') return;
-        const tokEl = e.target.closest('.vtt-token.movable');
-        if (!tokEl) return;
-        e.stopPropagation();
-
-        const tokId = tokEl.dataset.tokenId;
-        const tokData = vttData.map.tokens.find(t => t.id === tokId);
-        if (!tokData) return;
-
-        draggingToken = tokEl;
-        dragOrigin = { x: tokData.x, y: tokData.y };
-
-        if (!vttData.isMaster) {
-          const myR = vttData.roster.find(r => r.id === vttData.me.id);
-          const maxM = myR ? parseSpeedMeters(myR.speed) : 9;
-          dragLimitMeters = Math.max(0, maxM - movedThisTurn);
-        } else {
-          dragLimitMeters = null;
-        }
-        tokEl.setPointerCapture(e.pointerId);
-      };
-    }
-
-    // Pintar Névoa
-    if (fogCanvas) {
-      fogCanvas.onpointerdown = e => {
-        if (!vttData.isMaster || (tool !== 'reveal' && tool !== 'cover')) return;
-        e.stopPropagation();
-        isPainting = true;
-        pendingFogOps = [];
-        paintFogStep(e);
-      };
-
-      fogCanvas.onpointermove = e => {
-        if (vttData.isMaster && (tool === 'reveal' || tool === 'cover') && brushEl) {
-          const stage = document.getElementById('vtt-stage');
-          const rect = stage.getBoundingClientRect();
-          const pxSize = ((brushSize * 2) / 100) * stage.clientWidth;
-          brushEl.style.display = 'block';
-          brushEl.style.width = `${pxSize}px`;
-          brushEl.style.height = `${pxSize}px`;
-          brushEl.style.left = `${(e.clientX - rect.left) / zoom}px`;
-          brushEl.style.top = `${(e.clientY - rect.top) / zoom}px`;
-        }
-        if (isPainting) paintFogStep(e);
-      };
-
-      fogCanvas.onpointerleave = () => {
-        if (brushEl) brushEl.style.display = 'none';
-      };
-    }
-
-    // Pan & Régua Livre no Viewport
-    if (viewport) {
-      viewport.onpointerdown = e => {
-        if (draggingToken || isPainting) return;
-        if (tool === 'ruler') {
-          rulerOrigin = clientToStagePercent(e.clientX, e.clientY);
-          return;
-        }
-        isPanning = true;
-        panStart = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-      };
-    }
-
-    window.onpointermove = e => {
-      if (draggingToken) {
-        const pos = clientToStagePercent(e.clientX, e.clientY);
-        const target = { ...pos };
-        if (dragLimitMeters !== null) {
-          const d = calcMeters(dragOrigin, target);
-          if (d > dragLimitMeters && d > 0) {
-            const ratio = dragLimitMeters / d;
-            target.x = dragOrigin.x + (target.x - dragOrigin.x) * ratio;
-            target.y = dragOrigin.y + (target.y - dragOrigin.y) * ratio;
-          }
-        }
-        draggingToken.style.left = `${target.x}%`;
-        draggingToken.style.top = `${target.y}%`;
-        drawRuler(dragOrigin, target, dragLimitMeters);
-        return;
-      }
-
-      if (rulerOrigin) {
-        const pos = clientToStagePercent(e.clientX, e.clientY);
-        drawRuler(rulerOrigin, pos, null);
-        return;
-      }
-
-      if (isPanning) {
-        pan.x = e.clientX - panStart.x;
-        pan.y = e.clientY - panStart.y;
-        applyCamera();
-      }
-    };
-
-    window.onpointerup = () => {
-      if (draggingToken) {
-        const id = draggingToken.dataset.tokenId;
-        const x = parseFloat(draggingToken.style.left);
-        const y = parseFloat(draggingToken.style.top);
-        const dist = calcMeters(dragOrigin, { x, y });
-
-        if (!vttData.isMaster) {
-          movedThisTurn += dist;
-        }
-
-        const tokObj = vttData.map.tokens.find(t => t.id === id);
-        if (tokObj) {
-          tokObj.x = x;
-          tokObj.y = y;
-        }
-
-        draggingToken = null;
-        clearRuler();
-
-        vttApi('move', 'POST', { id, x, y })
-          .then(() => { if (!vttData.isMaster) renderTableView(); })
-          .catch(err => showToast(err.message));
-      }
-
-      if (isPainting) {
-        isPainting = false;
-        if (pendingFogOps.length) {
-          const batch = pendingFogOps.slice();
-          pendingFogOps = [];
-          vttApi('fog', 'POST', { ops: batch }).catch(() => {});
-        }
-      }
-
-      if (rulerOrigin) {
-        rulerOrigin = null;
-        clearRuler();
-      }
-
-      isPanning = false;
-    };
-  }
-
-  function paintFogStep(e) {
-    const pos = clientToStagePercent(e.clientX, e.clientY);
-    const rev = tool === 'reveal' ? 1 : 0;
-    const op = [Number(pos.x.toFixed(2)), Number(pos.y.toFixed(2)), brushSize, rev];
-    vttData.map.fog = vttData.map.fog || { on: true, ops: [] };
-    vttData.map.fog.on = true;
-    vttData.map.fog.ops.push(op);
-    pendingFogOps.push(op);
-    updateLiveBoard();
-  }
-
-  // =========================================================================
-  // ABA 2: BIBLIOTECA DE MAPAS & NPCS (ARMAZENAMENTO COM IMAGENS PERSONALIZÁVEIS)
-  // =========================================================================
-  function renderLibraryView() {
-    const app = document.getElementById('app');
-    if (!app || !vttData || !vttData.isMaster) return;
-
-    const maps = vttData.library?.maps || [];
-    const npcs = vttData.library?.npcs || [];
-    const editM = maps.find(m => m.id === editingMapId) || { name: '', bg: '', grid: 24, cellMeters: 1.5, fogOn: false };
-    const editN = npcs.find(n => n.id === editingNpcId) || { name: '', avatar: '', color: '#9e1b1b', size: 1, hp: 20, ac: 12 };
-
+  // --- PAINEL DO MESTRE (GERENCIAR JOGADORES) ---
+  function renderAdmin() {
     app.innerHTML = `
-      <div class="vtt-lib-grid">
-        <!-- COLUNA 1: BIBLIOTECA DE MAPAS -->
-        <section class="vtt-lib-panel">
-          <h2>🗺️ Biblioteca de Mapas (${maps.length})</h2>
-
-          <form class="vtt-form-box" id="vtt-form-map">
+      <div class="adm-wrap">
+        <section class="pn pn-paper rise">
+          <h2>${I(P.cross, 'gw')}Novo Jogador</h2>
+          <form id="adm-form" style="display:grid;gap:12px;">
             <div>
-              <label class="vtt-form-label">Nome do Mapa / Cena</label>
-              <input class="vtt-field" id="lib-map-name" value="${esc(editM.name)}" placeholder="Ex: Saloon Abandonado" required>
+              <label class="mu" style="font-size:.85rem;">Nome do Jogador</label>
+              <input id="adm-name" placeholder="Ex: Arthur" required>
             </div>
-
             <div>
-              <label class="vtt-form-label">Imagem do Mapa (Upload ou Link URL)</label>
-              <div class="vtt-img-picker-row">
-                <input class="vtt-field" id="lib-map-bg" value="${esc(editM.bg)}" placeholder="Cole URL ou clique em Enviar Imagem">
-                <button type="button" class="vtt-btn gold" id="lib-map-upload" style="white-space:nowrap;">📁 Enviar</button>
-              </div>
+              <label class="mu" style="font-size:.85rem;">Código de Acesso (PIN)</label>
+              <input id="adm-pin" placeholder="Ex: arthur123" required>
             </div>
-
-            <div class="vtt-form-row">
-              <div>
-                <label class="vtt-form-label">Colunas da Grade (0 = sem)</label>
-                <input class="vtt-field" type="number" min="0" max="80" id="lib-map-grid" value="${Number(editM.grid ?? 24)}">
-              </div>
-              <div>
-                <label class="vtt-form-label">Metros por Quadrado</label>
-                <input class="vtt-field" type="number" step="0.5" min="0.5" id="lib-map-scale" value="${Number(editM.cellMeters || 1.5)}">
-              </div>
-            </div>
-
-            <label style="display:flex; align-items:center; gap:8px; font-family:'Special Elite',monospace; font-size:0.8rem;">
-              <input type="checkbox" id="lib-map-fog" ${editM.fogOn ? 'checked' : ''}> Iniciar com Névoa de Guerra ativada
-            </label>
-
-            <div style="display:flex; gap:8px;">
-              <button type="submit" class="vtt-btn gold" style="flex:1;">${editingMapId ? '💾 Atualizar Mapa' : '+ Salvar Mapa'}</button>
-              ${editingMapId ? `<button type="button" class="vtt-btn" id="lib-map-cancel">Cancelar</button>` : ''}
-            </div>
+            <button type="submit" class="bt">Cadastrar na Mesa</button>
           </form>
-
-          <div class="vtt-cards-list">
-            ${maps.length ? maps.map(m => `
-              <div class="vtt-saved-card">
-                <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-                  ${m.bg
-                    ? `<img class="vtt-map-thumb" src="${esc(m.bg)}" alt="">`
-                    : `<div class="vtt-map-thumb" style="display:flex;align-items:center;justify-content:center;color:#d6be96;font-size:0.75rem;">Sem img</div>`
-                  }
-                  <div style="min-width:0;">
-                    <strong style="display:block; font-family:'IM Fell DW Pica',serif; font-size:1.05rem;">${esc(m.name)}</strong>
-                    <span style="font-family:'Special Elite',monospace; font-size:0.74rem; color:#5a422b;">
-                      Grade: ${m.grid || 'Off'} · ${m.cellMeters || 1.5}m ${m.fogOn ? '· 🌑 Névoa' : ''}
-                    </span>
-                  </div>
-                </div>
-
-                <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
-                  <button class="vtt-btn gold" data-activate-map="${esc(m.id)}">▶ Usar na Mesa</button>
-                  <button class="vtt-btn" data-edit-map="${esc(m.id)}">✏️</button>
-                  <button class="vtt-btn danger" data-del-map="${esc(m.id)}">🗑️</button>
-                </div>
-              </div>
-            `).join('') : `<p style="font-size:0.86rem; margin:0;">Nenhum mapa salvo ainda.</p>`}
-          </div>
         </section>
 
-        <!-- COLUNA 2: BIBLIOTECA DE NPCS & INIMIGOS -->
-        <section class="vtt-lib-panel">
-          <h2>👹 Biblioteca de NPCs &amp; Inimigos (${npcs.length})</h2>
-
-          <form class="vtt-form-box" id="vtt-form-npc">
-            <div class="vtt-form-row">
-              <div>
-                <label class="vtt-form-label">Nome do NPC / Criatura</label>
-                <input class="vtt-field" id="lib-npc-name" value="${esc(editN.name)}" placeholder="Ex: Pistoleiro Renegado" required>
-              </div>
-              <div>
-                <label class="vtt-form-label">Tamanho &amp; Cor do Anel</label>
-                <div style="display:flex; gap:6px;">
-                  <select class="vtt-field" id="lib-npc-size">
-                    <option value="1" ${Number(editN.size) === 1 ? 'selected' : ''}>1x1 (Médio)</option>
-                    <option value="2" ${Number(editN.size) === 2 ? 'selected' : ''}>2x2 (Grande)</option>
-                    <option value="3" ${Number(editN.size) === 3 ? 'selected' : ''}>3x3 (Enorme)</option>
-                  </select>
-                  <input type="color" id="lib-npc-color" value="${esc(editN.color || '#9e1b1b')}" style="width:42px; height:34px; border:1px solid #6b5033; background:none; cursor:pointer;">
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label class="vtt-form-label">Foto / Token do NPC (Upload ou Link URL)</label>
-              <div class="vtt-img-picker-row">
-                <input class="vtt-field" id="lib-npc-avatar" value="${esc(editN.avatar)}" placeholder="Cole URL ou clique em Enviar Foto">
-                <button type="button" class="vtt-btn gold" id="lib-npc-upload" style="white-space:nowrap;">📁 Enviar</button>
-              </div>
-            </div>
-
-            <div class="vtt-form-row">
-              <div>
-                <label class="vtt-form-label">Pontos de Vida (HP)</label>
-                <input class="vtt-field" type="number" min="1" id="lib-npc-hp" value="${Number(editN.hp || 20)}">
-              </div>
-              <div>
-                <label class="vtt-form-label">Defesa (CA)</label>
-                <input class="vtt-field" type="number" min="1" id="lib-npc-ac" value="${Number(editN.ac || 12)}">
-              </div>
-            </div>
-
-            <div style="display:flex; gap:8px;">
-              <button type="submit" class="vtt-btn gold" style="flex:1;">${editingNpcId ? '💾 Atualizar NPC' : '+ Salvar NPC'}</button>
-              ${editingNpcId ? `<button type="button" class="vtt-btn" id="lib-npc-cancel">Cancelar</button>` : ''}
-            </div>
-          </form>
-
-          <div class="vtt-cards-list">
-            ${npcs.length ? npcs.map(n => `
-              <div class="vtt-saved-card">
-                <div style="display:flex; align-items:center; gap:10px; min-width:0;">
-                  ${n.avatar
-                    ? `<img class="vtt-npc-thumb" src="${esc(n.avatar)}" style="border-color:${esc(n.color || '#9e1b1b')};" alt="">`
-                    : `<div class="vtt-npc-thumb" style="border-color:${esc(n.color || '#9e1b1b')}; display:flex; align-items:center; justify-content:center; color:#f4e4c8; font-family:'IM Fell English SC',serif;">${esc((n.name || '?').slice(0, 2).toUpperCase())}</div>`
-                  }
-                  <div style="min-width:0;">
-                    <strong style="display:block; font-family:'IM Fell DW Pica',serif; font-size:1.05rem;">${esc(n.name)}</strong>
-                    <span style="font-family:'Special Elite',monospace; font-size:0.74rem; color:#5a422b;">
-                      HP: ${n.hp} · CA: ${n.ac} · ${n.size || 1}x${n.size || 1}
-                    </span>
+        <section class="pn rise">
+          <h2>${I(P.skull, 'sw')}Jogadores da Mesa <small>${DATA.length}</small></h2>
+          ${DATA.length
+            ? DATA.map(p => `
+                <div class="adm-row">
+                  <div>
+                    <strong style="font:400 1.15rem var(--hd);letter-spacing:.05em;color:#f6e2a8;">${esc(p.name)}</strong>
+                    <div style="margin-top:4px;display:flex;gap:8px;align-items:center;">
+                      <span class="mu" style="font-size:.85rem;">Código:</span>
+                      <span class="pin-tag">${esc(p.pin || '—')}</span>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:6px;">
+                    <button class="bt" data-act="open-player-sheet" data-id="${p.id}">Abrir Ficha</button>
+                    <button class="bt x" data-act="del-player" data-id="${p.id}" data-name="${esc(p.name)}" title="Remover">×</button>
                   </div>
                 </div>
-
-                <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;">
-                  <button class="vtt-btn gold" data-spawn-lib-npc="${esc(n.id)}">+ Mesa</button>
-                  <button class="vtt-btn" data-edit-npc="${esc(n.id)}">✏️</button>
-                  <button class="vtt-btn danger" data-del-npc="${esc(n.id)}">🗑️</button>
-                </div>
-              </div>
-            `).join('') : `<p style="font-size:0.86rem; margin:0;">Nenhum NPC salvo ainda.</p>`}
-          </div>
+              `).join('')
+            : '<p class="mu">Nenhum jogador cadastrado ainda.</p>'
+          }
         </section>
       </div>
     `;
 
-    bindLibraryEvents();
+    document.getElementById('adm-form').onsubmit = e => {
+      e.preventDefault();
+      const name = document.getElementById('adm-name').value.trim();
+      const pin = document.getElementById('adm-pin').value.trim();
+      if (!name || !pin) return;
+
+      api('players', 'POST', { name, pin })
+        .then(() => {
+          toast('Jogador cadastrado!');
+          loadAll();
+        })
+        .catch(err => toast(err.message));
+    };
   }
 
-  function bindLibraryEvents() {
-    const app = document.getElementById('app');
+  // --- MODAL DO ITEM ---
+  function openItem(i) {
+    oi = i;
+    const s = S.items[i];
+    const p = 'items.' + i;
+    md.innerHTML =
+      '<div class="box pn">' +
+        '<button class="bt x cl" data-act="close" aria-label="Fechar">×</button>' +
+        '<div class="mrow">' +
+          '<div class="mimg" data-act="img" data-p="' + p + '.img" role="button" tabindex="0" aria-label="Trocar imagem">' +
+            imgOr(s.img, TIC[s.t] || 'dia', s.n) +
+            '<span class="ov">Trocar imagem</span>' +
+          '</div>' +
+          '<div class="mf">' +
+            '<input class="mn" data-set="' + p + '.n" value="' + esc(s.n) + '" placeholder="Nome do item" aria-label="Nome do item">' +
+            '<select data-set="' + p + '.t" aria-label="Tipo">' +
+              TN.map(t => '<option' + (t === s.t ? ' selected' : '') + '>' + t + '</option>').join('') +
+            '</select>' +
+            '<div class="qty">' +
+              '<button class="bt" data-act="q" data-n="-1" aria-label="Menos">−</button>' +
+              '<input type="number" min="0" data-set="' + p + '.q" value="' + (+s.q || 0) + '" aria-label="Quantidade">' +
+              '<button class="bt" data-act="q" data-n="1" aria-label="Mais">+</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="r2" style="grid-template-columns:1fr 1.6fr">' +
+          '<input data-set="' + p + '.dm" value="' + esc(s.dm) + '" placeholder="Dano" aria-label="Dano">' +
+          '<input data-set="' + p + '.dt" value="' + esc(s.dt) + '" placeholder="Tipo, alcance ou efeito do dano" aria-label="Tipo de dano">' +
+        '</div>' +
+        '<textarea rows="4" data-set="' + p + '.d" placeholder="Descrição" aria-label="Descrição">' + esc(s.d) + '</textarea>' +
+        '<div class="ctl">' +
+          (s.img ? '<button class="bt" data-act="rmImg">Remover imagem</button>' : '') +
+          '<button class="bt" data-act="delItem">Excluir item</button>' +
+        '</div>' +
+      '</div>';
 
-    // Upload de imagem do Mapa
-    document.getElementById('lib-map-upload').onclick = async () => {
-      const dataUrl = await pickAndCompressImage({ square: false, maxSize: 1400, quality: 0.78 });
-      if (dataUrl) {
-        document.getElementById('lib-map-bg').value = dataUrl;
-        showToast('Imagem do mapa carregada!');
+    requestAnimationFrame(() => md.classList.add('on'));
+  }
+
+  function closeItem() {
+    if (oi < 0) return;
+    oi = -1;
+    md.classList.remove('on');
+    flush();
+    render();
+  }
+
+  // --- EVENTOS GLOBAIS ---
+  pick.addEventListener('change', () => {
+    const f = pick.files && pick.files[0];
+    const p = pend;
+    pick.value = '';
+    pend = null;
+    if (!f || !p) return;
+    if (f.size > 10e6) {
+      toast('Imagem muito grande (máximo 10 MB).');
+      return;
+    }
+    compressImage(f, p, dataUrl => {
+      setPath(p, dataUrl);
+      flush();
+      render();
+      if (oi >= 0) openItem(oi);
+    });
+  });
+
+  document.addEventListener('input', e => {
+    const t = e.target;
+    const p = t.dataset && t.dataset.set;
+    if (!p) return;
+    let v = t.value;
+    if (t.type === 'number') {
+      v = parseFloat(v);
+      if (isNaN(v) || (v < 0 && !/^attrs/.test(p))) v = 0;
+    }
+    setPath(p, v);
+    save();
+
+    let m = /^(hp|st|sn)\.[cmx]$/.exec(p);
+    if (m) fix(m[1]);
+
+    m = /^attrs\.(\d+)\.1$/.exec(p);
+    if (m) {
+      const el = document.querySelector('[data-mod="' + m[1] + '"]');
+      if (el) {
+        const q = mod(v);
+        el.textContent = sg(q);
+        el.className = 'mod ' + (q > 0 ? 'pos' : q < 0 ? 'neg' : '');
       }
-    };
+    }
+  });
 
-    // Upload de imagem do NPC
-    document.getElementById('lib-npc-upload').onclick = async () => {
-      const dataUrl = await pickAndCompressImage({ square: true, maxSize: 200, quality: 0.82 });
-      if (dataUrl) {
-        document.getElementById('lib-npc-avatar').value = dataUrl;
-        showToast('Foto do NPC carregada!');
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeItem();
+    else if (e.key === 'Enter' && e.target.getAttribute && e.target.getAttribute('role') === 'button') {
+      e.target.click();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    if (b === md && e.target !== md) return;
+
+    const a = b.dataset.act;
+    const i = +b.dataset.i;
+    const k = b.dataset.k;
+    let v;
+    let n;
+
+    switch (a) {
+      case 'go-sheet':
+        view = 'sheet';
+        renderNav();
+        render();
+        break;
+      case 'go-admin':
+        view = 'admin';
+        renderNav();
+        renderAdmin();
+        break;
+      case 'logout':
+        sessionStorage.removeItem('fk');
+        KEY = '';
+        ME = null;
+        renderLogin();
+        break;
+      case 'sel-player': {
+        if (st0) flush();
+        cid = b.dataset.id;
+        const found = DATA.find(p => p.id === cid);
+        if (found) S = found.sheet;
+        render();
+        break;
       }
-    };
-
-    const cancelMap = document.getElementById('lib-map-cancel');
-    if (cancelMap) cancelMap.onclick = () => { editingMapId = null; renderLibraryView(); };
-
-    const cancelNpc = document.getElementById('lib-npc-cancel');
-    if (cancelNpc) cancelNpc.onclick = () => { editingNpcId = null; renderLibraryView(); };
-
-    // Salvar Mapa
-    document.getElementById('vtt-form-map').onsubmit = e => {
-      e.preventDefault();
-      const maps = (vttData.library?.maps || []).slice();
-      const entry = {
-        id: editingMapId || ('map_' + Date.now().toString(36)),
-        name: document.getElementById('lib-map-name').value.trim(),
-        bg: document.getElementById('lib-map-bg').value.trim(),
-        grid: Math.max(0, Math.min(80, Number(document.getElementById('lib-map-grid').value) || 0)),
-        cellMeters: Math.max(0.5, Number(document.getElementById('lib-map-scale').value) || 1.5),
-        fogOn: document.getElementById('lib-map-fog').checked
-      };
-      const idx = maps.findIndex(m => m.id === entry.id);
-      if (idx >= 0) maps[idx] = entry;
-      else maps.push(entry);
-
-      vttApi('library', 'POST', { maps })
-        .then(res => {
-          vttData.library = res.library;
-          editingMapId = null;
-          showToast('Mapa salvo na biblioteca!');
-          renderLibraryView();
-        })
-        .catch(err => showToast(err.message));
-    };
-
-    // Salvar NPC
-    document.getElementById('vtt-form-npc').onsubmit = e => {
-      e.preventDefault();
-      const npcs = (vttData.library?.npcs || []).slice();
-      const hp = Math.max(1, Number(document.getElementById('lib-npc-hp').value) || 20);
-      const entry = {
-        id: editingNpcId || ('npc_' + Date.now().toString(36)),
-        name: document.getElementById('lib-npc-name').value.trim(),
-        avatar: document.getElementById('lib-npc-avatar').value.trim(),
-        color: document.getElementById('lib-npc-color').value,
-        size: Number(document.getElementById('lib-npc-size').value) || 1,
-        hp,
-        mhp: hp,
-        ac: Math.max(1, Number(document.getElementById('lib-npc-ac').value) || 12)
-      };
-      const idx = npcs.findIndex(n => n.id === entry.id);
-      if (idx >= 0) npcs[idx] = entry;
-      else npcs.push(entry);
-
-      vttApi('library', 'POST', { npcs })
-        .then(res => {
-          vttData.library = res.library;
-          editingNpcId = null;
-          showToast('NPC salvo na biblioteca!');
-          renderLibraryView();
-        })
-        .catch(err => showToast(err.message));
-    };
-
-    // Ações nos cards de Mapas
-    app.querySelectorAll('[data-activate-map]').forEach(btn => {
-      btn.onclick = () => {
-        const m = (vttData.library?.maps || []).find(x => x.id === btn.dataset.activateMap);
-        if (!m) return;
-        vttApi('table', 'POST', { op: 'activate_map', map: m, keepTokens: true })
+      case 'open-player-sheet': {
+        cid = b.dataset.id;
+        const found = DATA.find(p => p.id === cid);
+        if (found) S = found.sheet;
+        view = 'sheet';
+        renderNav();
+        render();
+        break;
+      }
+      case 'del-player': {
+        const pid = b.dataset.id;
+        const pname = b.dataset.name;
+        if (!confirm('Remover "' + pname + '" e apagar permanentemente a ficha?')) return;
+        api('players/' + pid, 'DELETE')
           .then(() => {
-            showToast(`Mapa "${m.name}" carregado na mesa!`);
-            openVttTab('table');
+            toast('Jogador removido.');
+            loadAll();
           })
-          .catch(err => showToast(err.message));
-      };
-    });
+          .catch(err => toast(err.message));
+        break;
+      }
+      case 'toggle-lock':
+        S.lock = !S.lock;
+        flush();
+        render();
+        toast(S.lock ? 'Atributos travados para o jogador.' : 'Atributos destravados.');
+        break;
+      case 'save-now':
+        flush();
+        toast('Ficha salva na nuvem.');
+        break;
+      case 'img':
+        pend = b.dataset.p;
+        pick.click();
+        break;
+      case 'dmg':
+        v = S[k];
+        n = amt(k);
+        if (k === 'hp' && v.x > 0) {
+          const ab = Math.min(v.x, n);
+          v.x -= ab;
+          n -= ab;
+        }
+        v.c = Math.max(0, v.c - n);
+        sync(k);
+        break;
+      case 'heal':
+        v = S[k];
+        v.c = Math.min(v.m, v.c + amt(k));
+        sync(k);
+        break;
+      case 'xtra':
+        S.hp.x = (S.hp.x || 0) + amt('hp');
+        sync('hp');
+        break;
+      case 'fl':
+        fl = b.dataset.t;
+        render();
+        break;
+      case 'open':
+        openItem(i);
+        break;
+      case 'addItem':
+        S.items.push({ n: '', q: 1, t: 'Outro', d: '', dm: '', dt: '' });
+        save();
+        render();
+        openItem(S.items.length - 1);
+        break;
+      case 'close':
+        closeItem();
+        break;
+      case 'q':
+        v = S.items[oi];
+        v.q = Math.max(0, (+v.q || 0) + (+b.dataset.n));
+        md.querySelector('[data-set$=".q"]').value = v.q;
+        save();
+        break;
+      case 'rmImg':
+        delete S.items[oi].img;
+        flush();
+        render();
+        openItem(oi);
+        break;
+      case 'delItem':
+        S.items.splice(oi, 1);
+        oi = -1;
+        md.classList.remove('on');
+        flush();
+        render();
+        break;
+      case 'addSk':
+        S.skills.push({ n: '', c: 0, dm: '', d: '', img: '' });
+        save();
+        render();
+        break;
+      case 'delSk':
+        S.skills.splice(i, 1);
+        save();
+        render();
+        break;
+      case 'addAt':
+        S.attrs.push(['', 0]);
+        save();
+        render();
+        break;
+      case 'delAt':
+        S.attrs.splice(i, 1);
+        save();
+        render();
+        break;
+      case 'use':
+        v = S.skills[i];
+        n = +v.c || 0;
+        if (S.st.c < n) {
+          toast('Não há ' + (S.st.n || 'Stamina') + ' suficiente para ' + (v.n || 'a habilidade') + '.');
+          break;
+        }
+        S.st.c -= n;
+        sync('st');
+        toast('Usou ' + (v.n || 'habilidade') + (n ? ' (−' + n + ')' : ''));
+        break;
+      case 'rmBg':
+        S.bg = '';
+        flush();
+        render();
+        break;
+      case 'reset':
+        if (!sure) {
+          sure = 1;
+          setTimeout(() => {
+            sure = 0;
+            render();
+          }, 4000);
+          render();
+        } else {
+          sure = 0;
+          const keepLock = S.lock;
+          const keepMnotes = S.mnotes;
+          S = cl(D);
+          S.lock = keepLock;
+          S.mnotes = keepMnotes;
+          const active = DATA.find(p => p.id === cid);
+          if (active) active.sheet = S;
+          flush();
+          render();
+          toast('Ficha limpa.');
+        }
+        break;
+    }
+  });
 
-    app.querySelectorAll('[data-edit-map]').forEach(btn => {
-      btn.onclick = () => {
-        editingMapId = btn.dataset.editMap;
-        renderLibraryView();
-      };
-    });
+  // --- PARTÍCULAS E GOTAS DE SANGUE ---
+  const cv = document.getElementById('cv');
+  const cx = cv.getContext('2d');
+  let W;
+  let H;
+  let M = [];
+  const rm = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    app.querySelectorAll('[data-del-map]').forEach(btn => {
-      btn.onclick = () => {
-        if (!confirm('Apagar este mapa da biblioteca?')) return;
-        const maps = (vttData.library?.maps || []).filter(m => m.id !== btn.dataset.delMap);
-        vttApi('library', 'POST', { maps }).then(res => {
-          vttData.library = res.library;
-          renderLibraryView();
-        });
-      };
-    });
-
-    // Ações nos cards de NPCs
-    app.querySelectorAll('[data-spawn-lib-npc]').forEach(btn => {
-      btn.onclick = () => {
-        const npc = (vttData.library?.npcs || []).find(x => x.id === btn.dataset.spawnLibNpc);
-        if (!npc) return;
-        vttApi('table', 'POST', { op: 'spawn_npc', npc })
-          .then(() => showToast(`${npc.name} colocado na mesa!`))
-          .catch(err => showToast(err.message));
-      };
-    });
-
-    app.querySelectorAll('[data-edit-npc]').forEach(btn => {
-      btn.onclick = () => {
-        editingNpcId = btn.dataset.editNpc;
-        renderLibraryView();
-      };
-    });
-
-    app.querySelectorAll('[data-del-npc]').forEach(btn => {
-      btn.onclick = () => {
-        if (!confirm('Apagar este NPC da biblioteca?')) return;
-        const npcs = (vttData.library?.npcs || []).filter(n => n.id !== btn.dataset.delNpc);
-        vttApi('library', 'POST', { npcs }).then(res => {
-          vttData.library = res.library;
-          renderLibraryView();
-        });
-      };
-    });
+  function mk(i) {
+    return {
+      x: Math.random() * W,
+      y: i ? Math.random() * H : H + 8,
+      r: 0.6 + Math.random() * 1.6,
+      v: 0.15 + Math.random() * 0.4,
+      p: Math.random() * 6.28,
+      a: 0.2 + Math.random() * 0.4
+    };
   }
 
-  // Observa o menu superior para manter as abas de Mesa e Mapas & NPCs sempre presentes
-  const navEl = document.getElementById('nv');
-  if (navEl) {
-    const obs = new MutationObserver(() => injectVttNavButtons());
-    obs.observe(navEl, { childList: true, attributes: true, attributeFilter: ['hidden'] });
-    injectVttNavButtons();
+  function sz() {
+    const r = devicePixelRatio || 1;
+    W = innerWidth;
+    H = innerHeight;
+    cv.width = W * r;
+    cv.height = H * r;
+    cx.setTransform(r, 0, 0, r, 0, 0);
+    M = [];
+    for (let i = 0; i < Math.min(45, (W * H) / 26000); i++) M.push(mk(1));
   }
+
+  function fr(t) {
+    cx.clearRect(0, 0, W, H);
+    M.forEach(m => {
+      m.y -= m.v;
+      m.x += Math.sin(t / 1700 + m.p) * 0.3;
+      if (m.y < -8) Object.assign(m, mk(0));
+      cx.fillStyle =
+        'rgba(226,58,70,' +
+        (m.a * (0.5 + 0.5 * Math.sin(t / 800 + m.p)) * Math.min(1, m.y / H + 0.2)).toFixed(3) +
+        ')';
+      cx.beginPath();
+      cx.arc(m.x, m.y, m.r, 0, 6.283);
+      cx.fill();
+    });
+    if (!rm) requestAnimationFrame(fr);
+  }
+
+  sz();
+  requestAnimationFrame(fr);
+  addEventListener('resize', sz);
+
+  let dh = '';
+  for (let j = 0; j < 8; j++) {
+    dh +=
+      '<i class="dr" style="left:' +
+      (5 + Math.random() * 90).toFixed(1) +
+      '%;--t:' +
+      (6 + Math.random() * 6).toFixed(1) +
+      's;--dl:' +
+      (Math.random() * 9).toFixed(1) +
+      's"></i>';
+  }
+  document.getElementById('drips').innerHTML = dh;
+
+  boot();
 })();
