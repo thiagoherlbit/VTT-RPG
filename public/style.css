@@ -1,511 +1,738 @@
-/* Estilos do Tabletop VTT e Biblioteca de Mapas & NPCs — Tema Santo Ofício */
-
-.wrap.vtt-wide {
-  max-width: 1520px;
-  padding-bottom: 24px;
+* {
+  box-sizing: border-box;
 }
 
-.vtt-workbench {
-  display: grid;
-  grid-template-columns: 1fr 330px;
-  gap: 16px;
-  align-items: start;
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background: #140507;
+  color: #241911;
+  font-family: 'IM Fell DW Pica', Georgia, serif;
 }
 
-@media (max-width: 980px) {
-  .vtt-workbench {
-    grid-template-columns: 1fr;
-  }
+.bg {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
 }
 
-/* --- PAINEL PRINCIPAL DO MAPA --- */
-.vtt-board-card {
-  background: linear-gradient(180deg, #1b1512 0%, #110d0b 100%);
-  border: 2px solid #59442b;
+.bgimg {
+  position: fixed;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.22;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.fog {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 50% 35%, transparent 35%, rgba(6, 2, 2, 0.78) 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+#cv {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* --- TOPBAR --- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(180deg, #241812 0%, #140d09 100%);
+  border-bottom: 2px solid #6b4e2b;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.85);
+}
+
+.topbar[hidden] {
+  display: none !important;
+}
+
+.tag-pill {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  border-radius: 4px;
+  background: rgba(114, 21, 21, 0.35);
+  border: 1px solid #8a2c2c;
+  color: #f3dfc1;
+}
+
+.bt {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.82rem;
+  padding: 7px 12px;
+  border-radius: 4px;
+  border: 1px solid #6b4f2d;
+  background: #281d16;
+  color: #ecdcc0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bt:hover {
+  border-color: #d6a456;
+  background: #38281e;
+}
+
+.bt.on,
+.bt.primary {
+  background: linear-gradient(180deg, #7d1818 0%, #520d0d 100%);
+  border-color: #d6a456;
+  color: #fff5e0;
+  box-shadow: 0 0 12px rgba(158, 26, 26, 0.45);
+}
+
+.bt.gold {
+  background: linear-gradient(180deg, #755528 0%, #4f3817 100%);
+  border-color: #d6a456;
+  color: #fff6e5;
+}
+
+.bt.danger {
+  border-color: #7d2525;
+  color: #f2abab;
+}
+
+.bt.danger:hover {
+  background: #701414;
+  color: #fff;
+}
+
+.bt.sm {
+  padding: 5px 9px;
+  font-size: 0.76rem;
+}
+
+.bt.icon-only {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* --- WRAPPER PRINCIPAL --- */
+.wrap {
+  position: relative;
+  z-index: 10;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 22px 16px 60px;
+}
+
+/* --- LOGIN (INTIMAÇÃO DO SANTO OFÍCIO) --- */
+.login-shell {
+  min-height: 82vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 30px 26px;
   border-radius: 6px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.78), inset 0 0 0 1px rgba(200, 157, 84, 0.16);
-  overflow: hidden;
+  background: linear-gradient(180deg, #ead8b8 0%, #d4be96 100%);
+  border: 3px solid #593e22;
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.9), inset 0 0 36px rgba(92, 61, 28, 0.28);
+  text-align: center;
+  position: relative;
 }
 
-.vtt-toolbar {
+.stamp-seal {
+  display: inline-block;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.16em;
+  color: #7a1212;
+  border: 2px solid #7a1212;
+  padding: 4px 12px;
+  border-radius: 4px;
+  transform: rotate(-2deg);
+  margin-bottom: 10px;
+}
+
+.login-card h1 {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 2rem;
+  color: #2b180e;
+  margin: 4px 0 6px;
+  letter-spacing: 0.06em;
+}
+
+.login-sub {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.82rem;
+  color: #573e26;
+  margin: 0 0 20px;
+}
+
+.login-input-wrap {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.login-input-wrap input {
+  flex: 1;
+}
+
+.login-error {
+  margin: 12px 0 0;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.82rem;
+  color: #8f1111;
+}
+
+/* --- INPUTS & CAMPOS --- */
+input, textarea, select {
+  width: 100%;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.88rem;
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid #6b4f31;
+  background: #f7ecd7;
+  color: #1e130b;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #8a1919;
+  box-shadow: 0 0 0 2px rgba(138, 25, 25, 0.22);
+}
+
+input:disabled {
+  opacity: 0.68;
+  cursor: not-allowed;
+}
+
+.field-label {
+  display: block;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #4f3822;
+  margin-bottom: 4px;
+}
+
+/* --- BARRA DA FICHA --- */
+.sheet-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
   padding: 10px 14px;
-  background: linear-gradient(180deg, #271e19 0%, #1a1310 100%);
-  border-bottom: 1px solid #4d3a24;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #271b15 0%, #19110d 100%);
+  border: 2px solid #5e4427;
+  color: #eddcc0;
 }
 
-.vtt-tool-group {
+.player-tabs {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
 
-.vtt-scene-title {
-  font-family: 'IM Fell English SC', serif;
-  font-size: 1.15rem;
-  color: #e9c98b;
-  letter-spacing: 0.04em;
-  margin-right: 6px;
-}
-
-.vtt-btn {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.78rem;
-  padding: 6px 10px;
-  border-radius: 4px;
-  border: 1px solid #5d472c;
-  background: #241b16;
-  color: #e6d5b8;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.vtt-btn:hover {
-  border-color: #c89d54;
-  background: #33261e;
-}
-
-.vtt-btn.active {
-  background: #7a1818;
-  border-color: #d99b4e;
-  color: #fff3dc;
-  box-shadow: 0 0 10px rgba(168, 28, 28, 0.45);
-}
-
-.vtt-btn.gold {
-  background: linear-gradient(180deg, #6e5128 0%, #4d3719 100%);
-  border-color: #c89d54;
-  color: #fff4dc;
-}
-
-.vtt-btn.danger {
-  border-color: #7d2424;
-  color: #f0a8a8;
-}
-
-.vtt-btn.danger:hover {
-  background: #6b1515;
-  color: #fff;
-}
-
-.vtt-select,
-.vtt-input {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.82rem;
-  padding: 6px 9px;
-  border-radius: 4px;
-  border: 1px solid #59442b;
-  background: #140f0d;
-  color: #ecdcc2;
-}
-
-/* --- VIEWPORT & PALCO DO MAPA --- */
-.vtt-viewport {
-  position: relative;
-  width: 100%;
-  height: 74vh;
-  min-height: 460px;
-  overflow: hidden;
-  background: radial-gradient(circle at center, #1e1815 0%, #0b0807 100%);
-  user-select: none;
-  touch-action: none;
-}
-
-.vtt-pan-layer {
-  position: absolute;
-  inset: 0;
-  display: flex;
+.sync-status {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  transform-origin: center center;
-}
-
-.vtt-stage {
-  position: relative;
-  display: inline-block;
-  max-width: 100%;
-  max-height: 100%;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.9);
-}
-
-.vtt-stage img#vtt-bg-img {
-  display: block;
-  max-width: 100%;
-  max-height: 74vh;
-  width: auto;
-  height: auto;
-  pointer-events: none;
-}
-
-.vtt-empty-map {
-  width: 820px;
-  max-width: 92vw;
-  height: 480px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  border: 2px dashed #5d472c;
-  color: #bfa988;
-  font-family: 'IM Fell DW Pica', serif;
-  font-size: 1.15rem;
-  text-align: center;
-  padding: 20px;
-}
-
-.vtt-grid-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.vtt-tokens-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-#vtt-fog-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-#vtt-fog-canvas.painting {
-  pointer-events: auto;
-  cursor: none;
-}
-
-.vtt-ruler-layer {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: 25;
-}
-
-.vtt-brush-cursor {
-  position: absolute;
-  border: 2px dashed #f5d28c;
-  border-radius: 50%;
-  background: rgba(245, 210, 140, 0.14);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  display: none;
-  z-index: 30;
-}
-
-/* --- TOKENS NO MAPA --- */
-.vtt-token {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 3px solid #c89d54;
-  background: #241914;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-  z-index: 15;
-  transition: box-shadow 0.15s ease;
-}
-
-.vtt-token.movable {
-  cursor: grab;
-}
-
-.vtt-token.movable:active {
-  cursor: grabbing;
-  z-index: 22;
-}
-
-.vtt-token.mine {
-  box-shadow: 0 0 0 2px #f2cf7e, 0 6px 16px rgba(0, 0, 0, 0.9);
-}
-
-.vtt-token img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.vtt-token-initials {
-  font-family: 'IM Fell English SC', serif;
-  color: #f7ead2;
-  font-size: 0.95rem;
-  font-weight: bold;
-  pointer-events: none;
-}
-
-.vtt-token-tag {
-  position: absolute;
-  top: calc(100% + 3px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(16, 11, 9, 0.88);
-  border: 1px solid #5c462b;
-  color: #f4e6cc;
+  gap: 6px;
   font-family: 'Special Elite', monospace;
-  font-size: 0.68rem;
-  padding: 1px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-  pointer-events: none;
+  font-size: 0.76rem;
+  color: #cbb592;
 }
 
-.vtt-token-hp {
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 82%;
-  height: 4px;
-  background: #1a0606;
-  border: 1px solid #000;
-  border-radius: 2px;
-  overflow: hidden;
-  pointer-events: none;
+.sync-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #3aa357;
 }
 
-.vtt-token-hp > i {
-  display: block;
-  height: 100%;
-  background: #b82323;
+.sync-dot.pending {
+  background: #e09f3e;
 }
 
-/* --- BARRA LATERAL: ELENCO DA MESA (PÔR / TIRAR JOGADORES & NPCS) --- */
-.vtt-sidebar {
-  display: grid;
-  gap: 14px;
-}
-
-.vtt-side-box {
-  background: linear-gradient(180deg, #e7d6b7 0%, #d4be98 100%);
-  color: #241911;
-  border: 2px solid #594127;
+/* --- CARTAZ PROCURADO (CABEÇALHO DO PERSONAGEM) --- */
+.poster-card {
+  background: linear-gradient(180deg, #ead8b8 0%, #d3bc93 100%);
+  border: 3px solid #573d21;
   border-radius: 6px;
-  padding: 12px 14px;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.65);
+  padding: 18px 20px 22px;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(99, 66, 30, 0.25);
+  margin-bottom: 18px;
+  position: relative;
 }
 
-.vtt-side-title {
-  font-family: 'IM Fell English SC', serif;
-  font-size: 1.05rem;
-  color: #4a1212;
-  border-bottom: 1px solid rgba(74, 18, 18, 0.28);
-  padding-bottom: 6px;
-  margin: 0 0 10px 0;
+.poster-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.vtt-roster-list {
-  display: grid;
-  gap: 8px;
-}
-
-.vtt-roster-item {
-  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 7px 8px;
-  background: rgba(45, 31, 18, 0.08);
-  border: 1px solid rgba(75, 52, 29, 0.28);
-  border-radius: 4px;
+  border-bottom: 2px solid #4a2f18;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
 }
 
-.vtt-roster-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.vtt-mini-avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 2px solid #5c3d20;
-  background: #2b1d14;
-  color: #f3e4c8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.wanted-title {
   font-family: 'IM Fell English SC', serif;
-  font-size: 0.85rem;
-  overflow: hidden;
-  flex-shrink: 0;
+  font-size: 1.9rem;
+  letter-spacing: 0.14em;
+  color: #26140a;
+  margin: 0;
 }
 
-.vtt-mini-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.vtt-roster-meta {
-  min-width: 0;
-}
-
-.vtt-roster-name {
-  display: block;
-  font-family: 'IM Fell DW Pica', serif;
-  font-weight: bold;
-  font-size: 0.95rem;
-  color: #1f140c;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.vtt-roster-sub {
-  display: block;
-  font-family: 'Special Elite', monospace;
-  font-size: 0.72rem;
-  color: #5a422b;
-}
-
-.vtt-toggle-seat {
-  font-family: 'Special Elite', monospace;
-  font-size: 0.72rem;
-  padding: 5px 8px;
-  border-radius: 4px;
-  border: 1px solid #4d361f;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.vtt-toggle-seat.in {
-  background: #7b1818;
-  color: #fff2dc;
-  border-color: #4f0d0d;
-}
-
-.vtt-toggle-seat.out {
-  background: #275432;
-  color: #eef9f0;
-  border-color: #17381f;
-}
-
-/* --- ABA DE BIBLIOTECA: MAPAS & NPCS --- */
-.vtt-lib-grid {
+.hero-body {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  align-items: start;
+  grid-template-columns: 150px 1fr;
+  gap: 18px;
+  align-items: center;
 }
 
-@media (max-width: 960px) {
-  .vtt-lib-grid {
+@media (max-width: 640px) {
+  .hero-body {
     grid-template-columns: 1fr;
   }
 }
 
-.vtt-lib-panel {
-  background: linear-gradient(180deg, #e8d8ba 0%, #d5c09b 100%);
-  color: #23170f;
-  border: 2px solid #594127;
-  border-radius: 6px;
-  padding: 18px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
-}
-
-.vtt-lib-panel h2 {
-  font-family: 'IM Fell English SC', serif;
-  color: #5c1111;
-  margin: 0 0 12px 0;
-  padding-bottom: 8px;
-  border-bottom: 2px solid rgba(92, 17, 17, 0.28);
-}
-
-.vtt-form-box {
-  background: rgba(58, 40, 22, 0.08);
-  border: 1px solid rgba(89, 65, 39, 0.35);
-  border-radius: 5px;
-  padding: 12px;
-  display: grid;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.vtt-form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.vtt-form-label {
-  display: block;
-  font-family: 'Special Elite', monospace;
-  font-size: 0.75rem;
-  color: #4a3520;
-  margin-bottom: 3px;
-}
-
-.vtt-field {
-  width: 100%;
-  box-sizing: border-box;
-  font-family: 'Special Elite', monospace;
-  font-size: 0.84rem;
-  padding: 7px 9px;
+.avatar-box {
+  width: 150px;
+  height: 150px;
+  margin: 0 auto;
+  border: 4px solid #4a3118;
   border-radius: 4px;
-  border: 1px solid #6b5033;
-  background: #f6ebd6;
-  color: #1e140c;
-}
-
-.vtt-img-picker-row {
+  background: #261a12;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
   display: flex;
-  gap: 8px;
   align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.55);
 }
 
-.vtt-cards-list {
+.avatar-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: sepia(0.18) contrast(1.05);
+}
+
+.avatar-placeholder {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 2.4rem;
+  color: #d9c098;
+}
+
+.avatar-overlay {
+  position: absolute;
+  inset: auto 0 0 0;
+  background: rgba(20, 10, 6, 0.82);
+  color: #f3e2c4;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.72rem;
+  text-align: center;
+  padding: 5px;
+}
+
+.hero-fields {
   display: grid;
-  gap: 10px;
+  grid-template-columns: 1fr 110px;
+  gap: 12px;
 }
 
-.vtt-saved-card {
+.hero-fields .full {
+  grid-column: 1 / -1;
+}
+
+.hero-name-input {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 1.35rem;
+  font-weight: bold;
+}
+
+/* --- CHAPAS DE FERRO & ECG (VIDA E STAMINA) --- */
+.vitals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 820px) {
+  .vitals-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.iron-card {
+  background: linear-gradient(180deg, #27201d 0%, #171210 100%);
+  border: 2px solid #59442d;
+  border-radius: 6px;
+  padding: 14px;
+  color: #efe0c6;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.75);
+}
+
+.iron-card .field-label {
+  color: #d7bc91;
+}
+
+.vital-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px;
-  background: #f4e7ce;
-  border: 1px solid #755838;
-  border-radius: 5px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
-.vtt-map-thumb {
-  width: 78px;
-  height: 52px;
+.vital-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.vital-controls input {
+  width: 56px;
+  text-align: center;
+  padding: 5px;
+  background: #120d0b;
+  color: #f7ead2;
+  border-color: #6b5033;
+}
+
+.ecg-track {
+  position: relative;
+  height: 16px;
+  background: #0d0707;
+  border: 1px solid #4a3520;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ecg-fill {
+  height: 100%;
+  transition: width 0.25s ease;
+}
+
+.ecg-fill.hp {
+  background: linear-gradient(90deg, #5e0b0b 0%, #b81d1d 100%);
+}
+
+.ecg-fill.st {
+  background: linear-gradient(90deg, #6e4714 0%, #c98a2c 100%);
+}
+
+.ecg-line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.quick-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.quick-stats input {
+  text-align: center;
+  background: #120d0b;
+  color: #f7ead2;
+  border-color: #6b5033;
+  font-size: 1rem;
+  font-weight: bold;
+}
+
+/* --- COURO RACHADO (6 ATRIBUTOS) --- */
+.attrs-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 760px) {
+  .attrs-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.attr-card {
+  background: linear-gradient(180deg, #3a2316 0%, #24140c 100%);
+  border: 2px solid #755332;
+  border-radius: 6px;
+  padding: 12px 8px;
+  text-align: center;
+  color: #f4e5ca;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7), inset 0 0 0 1px rgba(224, 179, 108, 0.2);
+}
+
+.attr-code {
+  display: block;
+  font-family: 'IM Fell English SC', serif;
+  font-size: 1.05rem;
+  color: #e6bf7c;
+  letter-spacing: 0.08em;
+}
+
+.attr-mod-badge {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 1.65rem;
+  font-weight: bold;
+  color: #fff4de;
+  margin: 4px 0;
+}
+
+.attr-score-input {
+  width: 62px;
+  margin: 0 auto 4px;
+  text-align: center;
+  padding: 4px;
+  background: #160c07;
+  color: #f4e5ca;
+  border-color: #755332;
+}
+
+.attr-sub {
+  display: block;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.68rem;
+  color: #cbb089;
+}
+
+/* --- BLOCOS DE HABILIDADES & INVENTÁRIO --- */
+.modules-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 820px) {
+  .modules-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.parchment-card {
+  background: linear-gradient(180deg, #ead9ba 0%, #d4be96 100%);
+  border: 2px solid #5c4124;
+  border-radius: 6px;
+  padding: 16px;
+  color: #24180f;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75);
+}
+
+.wood-card {
+  background: linear-gradient(180deg, #2d1e15 0%, #1c120c 100%);
+  border: 2px solid #6b4c2b;
+  border-radius: 6px;
+  padding: 16px;
+  color: #f0e1c6;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.75);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(130, 96, 56, 0.38);
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  font-family: 'IM Fell English SC', serif;
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.parchment-card .card-title {
+  color: #5e1111;
+}
+
+.wood-card .card-title {
+  color: #e8c37e;
+}
+
+.item-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.list-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: 4px;
-  border: 1px solid #594127;
-  background: #231914;
-  object-fit: cover;
-  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(110, 80, 46, 0.32);
 }
 
-.vtt-npc-thumb {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  border: 3px solid #8a1c1c;
-  background: #231914;
-  object-fit: cover;
-  flex-shrink: 0;
+.wood-card .list-entry {
+  background: rgba(0, 0, 0, 0.32);
+  border-color: #4f3720;
+}
+
+.list-entry-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.list-entry-desc {
+  margin: 3px 0 0;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.76rem;
+  opacity: 0.85;
+}
+
+.inline-add-form {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(120, 88, 52, 0.4);
+}
+
+.inline-add-row {
+  display: grid;
+  grid-template-columns: 1fr 110px;
+  gap: 8px;
+}
+
+.master-secret-card {
+  margin-top: 18px;
+  background: linear-gradient(180deg, #2b1012 0%, #190809 100%);
+  border: 2px solid #8a2424;
+  border-radius: 6px;
+  padding: 16px;
+  color: #f4dede;
+}
+
+.master-secret-card .card-title {
+  color: #f2a7a7;
+}
+
+/* --- GERENCIAR JOGADORES --- */
+.admin-layout {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 820px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.player-row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: rgba(48, 32, 16, 0.08);
+  border: 1px solid #755634;
+}
+
+.pin-badge {
+  font-family: 'Special Elite', monospace;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: #241811;
+  color: #f2cf88;
+  font-size: 0.82rem;
+}
+
+/* --- MODAL & TOAST --- */
+.mdl {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(8, 4, 4, 0.82);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.mdl.on {
+  display: flex;
+}
+
+.mdl-box {
+  width: 100%;
+  max-width: 460px;
+  background: linear-gradient(180deg, #ead9ba 0%, #d4be96 100%);
+  border: 3px solid #593e22;
+  border-radius: 6px;
+  padding: 20px;
+  color: #24180f;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+}
+
+#toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 100;
+  padding: 10px 16px;
+  border-radius: 4px;
+  background: #231610;
+  border: 1px solid #d6a456;
+  color: #f7ead2;
+  font-family: 'Special Elite', monospace;
+  font-size: 0.84rem;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.85);
+  opacity: 0;
+  transform: translateY(10px);
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+#toast.on {
+  opacity: 1;
+  transform: translateY(0);
 }
