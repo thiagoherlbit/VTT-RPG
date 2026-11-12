@@ -148,7 +148,6 @@
     var out = Object.assign({}, base, raw);
     if (!out.name && fallbackName) out.name = fallbackName;
 
-    // Compatibilidade com formato numérico antigo de HP/Stamina
     if (typeof raw.hp === 'number') {
       out.hp = { n: 'Vida', c: raw.hp, m: Number(raw.mhp) || raw.hp || 20, x: Number(raw.tempHp) || 0 };
     } else {
@@ -161,14 +160,12 @@
       out.st = Object.assign(V0('Stamina'), raw.st || {});
     }
 
-    // Compatibilidade com atributos em objeto { FOR: 10, ... }
     if (raw.attrs && !Array.isArray(raw.attrs) && typeof raw.attrs === 'object') {
       out.attrs = Object.keys(raw.attrs).map(function (k) { return [k, Number(raw.attrs[k]) || 0]; });
     } else if (Array.isArray(raw.attrs)) {
       out.attrs = raw.attrs;
     }
 
-    // Compatibilidade com inventory -> items
     if (!Array.isArray(out.items) && Array.isArray(raw.inventory)) {
       out.items = raw.inventory.map(function (it) {
         return {
@@ -185,7 +182,6 @@
       out.items = [];
     }
 
-    // Compatibilidade com skills antigas
     if (Array.isArray(raw.skills)) {
       out.skills = raw.skills.map(function (sk) {
         if (sk.n !== undefined) return sk;
@@ -301,6 +297,8 @@
       '<span class="tag">' + (isMaster ? '👑 Mestre' : '🗡️ ' + esc(ME.name)) + '</span>' +
       '<button class="bt ' + (adm === 0 ? 'on' : '') + '" data-act="nav-sheet">' + (isMaster ? '📜 Fichas' : '📜 Minha Ficha') + '</button>' +
       (isMaster ? '<button class="bt ' + (adm === 1 ? 'on' : '') + '" data-act="nav-admin">👥 Gerenciar Jogadores</button>' : '') +
+      '<button class="bt" data-vtt-nav="table">🗺️ Mesa (Mapa)</button>' +
+      (isMaster ? '<button class="bt" data-vtt-nav="library">📚 Mapas &amp; NPCs</button>' : '') +
       '<button class="bt" data-act="nav-logout">Sair</button>';
   }
 
@@ -336,7 +334,7 @@
     app.innerHTML =
       '<section class="pn paper-pn stamp rise" style="max-width:420px; margin:12vh auto 0; padding:28px 24px;">' +
       '<h2>' + I(P.cross, 'gw') + 'Acesso ao Grimório</h2>' +
-      '<p class="mu" style="margin:0 0 14px;">Apresente seu salvo-conduto de jogador ou a chave do Inquisidor.</p>' +
+      '<p class="mu" style="margin:0 0 14px;">Informe seu código de acesso de jogador ou a chave do Mestre.</p>' +
       '<form id="login-form" style="display:grid; gap:12px;">' +
       '<div style="display:flex; gap:6px;">' +
       '<input id="lk" type="password" autocomplete="current-password" placeholder="Código de acesso" required>' +
@@ -369,7 +367,7 @@
     app.innerHTML =
       '<div class="adm-grid">' +
       '<section class="pn paper-pn rise">' +
-      '<h2>' + I(P.cross, 'gw') + 'Novo Salvo-Conduto</h2>' +
+      '<h2>' + I(P.cross, 'gw') + 'Novo Jogador</h2>' +
       '<form id="adm-add-form" style="display:grid; gap:12px;">' +
       '<div><label class="lab">Nome do Jogador</label><input id="adm-name" placeholder="Ex: Lucas" required></div>' +
       '<div><label class="lab">Código de Acesso (PIN)</label><input id="adm-pin" placeholder="Ex: lucas123" required></div>' +
@@ -588,7 +586,6 @@
   function optimizeAndApplyImage(file, targetPath) {
     var r = new FileReader();
     r.onload = function () {
-      // Se for GIF pequeno, preserva animação; caso contrário, redimensiona suavemente para caber no banco
       if (file.type === 'image/gif' && file.size < 450000) {
         setPath(targetPath, r.result);
         flush(false);
@@ -838,7 +835,6 @@
     });
   }
 
-  // Partículas de sangue e gotas escorrendo idênticas à referência
   var cv = document.getElementById('cv'), cx = cv.getContext('2d'), W, H, M = [], rm = matchMedia('(prefers-reduced-motion: reduce)').matches;
   function mk(i) { return { x: Math.random() * W, y: i ? Math.random() * H : H + 8, r: 0.6 + Math.random() * 1.6, v: 0.15 + Math.random() * 0.4, p: Math.random() * 6.28, a: 0.2 + Math.random() * 0.4 }; }
   function sz() {
