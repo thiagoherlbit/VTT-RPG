@@ -1,5 +1,3 @@
-/* Estilos do Tabletop VTT e Biblioteca de Mapas & NPCs — Tema Santo Ofício */
-
 .wrap.vtt-wide {
   max-width: 1520px;
   padding-bottom: 24px;
@@ -18,7 +16,6 @@
   }
 }
 
-/* --- PAINEL PRINCIPAL DO MAPA --- */
 .vtt-board-card {
   background: linear-gradient(180deg, #1b1512 0%, #110d0b 100%);
   border: 2px solid #59442b;
@@ -93,8 +90,8 @@
   color: #fff;
 }
 
-.vtt-select,
-.vtt-input {
+.vtt-select {
+  width: auto;
   font-family: 'Special Elite', monospace;
   font-size: 0.82rem;
   padding: 6px 9px;
@@ -104,7 +101,6 @@
   color: #ecdcc2;
 }
 
-/* --- VIEWPORT & PALCO DO MAPA --- */
 .vtt-viewport {
   position: relative;
   width: 100%;
@@ -159,12 +155,7 @@
   padding: 20px;
 }
 
-.vtt-grid-layer {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
+.vtt-grid-layer,
 .vtt-tokens-layer {
   position: absolute;
   inset: 0;
@@ -204,7 +195,6 @@
   z-index: 30;
 }
 
-/* --- TOKENS NO MAPA --- */
 .vtt-token {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -217,7 +207,6 @@
   justify-content: center;
   pointer-events: auto;
   z-index: 15;
-  transition: box-shadow 0.15s ease;
 }
 
 .vtt-token.movable {
@@ -285,7 +274,6 @@
   background: #b82323;
 }
 
-/* --- BARRA LATERAL: ELENCO DA MESA (PÔR / TIRAR JOGADORES & NPCS) --- */
 .vtt-sidebar {
   display: grid;
   gap: 14px;
@@ -401,7 +389,6 @@
   border-color: #17381f;
 }
 
-/* --- ABA DE BIBLIOTECA: MAPAS & NPCS --- */
 .vtt-lib-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -458,7 +445,6 @@
 
 .vtt-field {
   width: 100%;
-  box-sizing: border-box;
   font-family: 'Special Elite', monospace;
   font-size: 0.84rem;
   padding: 7px 9px;
