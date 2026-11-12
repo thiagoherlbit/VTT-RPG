@@ -1,5 +1,5 @@
 (function () {
-  let activeTab = 'sheet'; // 'sheet' | 'admin' | 'table' | 'library'
+  let activeTab = 'sheet';
   let vttData = null;
   let pollTimer = null;
   let zoom = 1;
@@ -7,7 +7,7 @@
   let isPanning = false;
   let panStart = { x: 0, y: 0 };
 
-  let tool = 'move'; // 'move' | 'reveal' | 'cover' | 'ruler'
+  let tool = 'move';
   let brushSize = 6;
   let isPainting = false;
   let pendingFogOps = [];
@@ -62,7 +62,6 @@
     return Number.isFinite(num) && num > 0 ? num : 9;
   }
 
-  // Compressão automática de imagens (Mapas e Tokens) para salvar leve no Cloudflare KV
   function pickAndCompressImage(options = {}) {
     const { square = false, maxSize = 1400, quality = 0.78 } = options;
     return new Promise(resolve => {
@@ -101,7 +100,6 @@
     });
   }
 
-  // --- INTEGRAÇÃO AUTOMÁTICA COM A BARRA DE NAVEGAÇÃO (#nv) ---
   function injectVttNavButtons() {
     const nv = document.getElementById('nv');
     if (!nv || nv.hidden || !nv.children.length) return;
@@ -118,7 +116,6 @@
     btnTable.dataset.vttTab = 'table';
     btnTable.textContent = '🗺️ Mesa (Mapa)';
     btnTable.onclick = () => openVttTab('table');
-
     nv.insertBefore(btnTable, logoutBtn || null);
 
     if (isMaster) {
@@ -130,7 +127,6 @@
       nv.insertBefore(btnLib, logoutBtn || null);
     }
 
-    // Quando clicar nas abas nativas (Fichas / Gerenciar Jogadores), sai do modo VTT
     nv.querySelectorAll('[data-nav]').forEach(btn => {
       if (btn.dataset.vttHooked) return;
       btn.dataset.vttHooked = '1';
@@ -202,9 +198,6 @@
       .catch(err => showToast(err.message));
   }
 
-  // =========================================================================
-  // ABA 1: MESA VIRTUAL (TABLETOP)
-  // =========================================================================
   function renderTableView() {
     const app = document.getElementById('app');
     if (!app || !vttData) return;
@@ -219,7 +212,6 @@
 
     app.innerHTML = `
       <div class="vtt-workbench">
-        <!-- COLUNA PRINCIPAL: MAPA -->
         <section class="vtt-board-card">
           <div class="vtt-toolbar">
             <div class="vtt-tool-group">
@@ -243,15 +235,15 @@
                   <option value="6" ${brushSize === 6 ? 'selected' : ''}>Pincel M</option>
                   <option value="12" ${brushSize === 12 ? 'selected' : ''}>Pincel G</option>
                 </select>
-                <button class="vtt-btn" id="vtt-fog-cover-all" title="Cobrir todo o mapa com névoa">Cobrir Tudo</button>
-                <button class="vtt-btn" id="vtt-fog-reveal-all" title="Remover névoa">Revelar Tudo</button>
+                <button class="vtt-btn" id="vtt-fog-cover-all">Cobrir Tudo</button>
+                <button class="vtt-btn" id="vtt-fog-reveal-all">Revelar Tudo</button>
               ` : `
                 <span class="vtt-btn" style="cursor:default;">Passo: <strong>${remMove.toFixed(1)}m</strong> / ${maxMove.toFixed(1)}m</span>
                 <button class="vtt-btn gold" id="vtt-reset-turn">↻ Novo Turno</button>
               `}
-              <button class="vtt-btn" id="vtt-zoom-out" title="Diminuir Zoom">−</button>
-              <button class="vtt-btn" id="vtt-zoom-reset" title="Resetar Câmera">100%</button>
-              <button class="vtt-btn" id="vtt-zoom-in" title="Aumentar Zoom">+</button>
+              <button class="vtt-btn" id="vtt-zoom-out">−</button>
+              <button class="vtt-btn" id="vtt-zoom-reset">100%</button>
+              <button class="vtt-btn" id="vtt-zoom-in">+</button>
             </div>
           </div>
 
@@ -262,7 +254,7 @@
                   ? `<img id="vtt-bg-img" src="${esc(map.bg)}" alt="Mapa">`
                   : `<div class="vtt-empty-map">
                       <strong>Nenhum mapa carregado na mesa</strong>
-                      <span>${isMaster ? 'Vá na aba "📚 Mapas & NPCs" para cadastrar mapas ou cole uma imagem abaixo.' : 'Aguarde o Mestre ativar o mapa da cena.'}</span>
+                      <span>${isMaster ? 'Vá na aba "📚 Mapas & NPCs" para cadastrar mapas e ativá-los aqui.' : 'Aguarde o Mestre ativar o mapa da cena.'}</span>
                     </div>`
                 }
                 <div class="vtt-grid-layer" id="vtt-grid"></div>
@@ -275,9 +267,7 @@
           </div>
         </section>
 
-        <!-- BARRA LATERAL: ELENCO NA MESA (PÔR / TIRAR PLAYERS E NPCS) -->
         <aside class="vtt-sidebar">
-          <!-- JOGADORES -->
           <div class="vtt-side-box">
             <h3 class="vtt-side-title">
               <span>🗡️ Jogadores na Mesa</span>
@@ -312,7 +302,6 @@
             </div>
           </div>
 
-          <!-- INVOCAR NPCS & TOKENS ATIVOS (MESTRE) -->
           ${isMaster ? `
             <div class="vtt-side-box">
               <h3 class="vtt-side-title">
@@ -360,9 +349,7 @@
     `;
 
     const bgImg = document.getElementById('vtt-bg-img');
-    if (bgImg) {
-      bgImg.onload = () => updateLiveBoard();
-    }
+    if (bgImg) bgImg.onload = () => updateLiveBoard();
     updateLiveBoard();
     bindTableEvents();
   }
@@ -380,7 +367,6 @@
     const h = stage.clientHeight;
     if (!w || !h) return;
 
-    // 1. Grid
     if (map.grid > 0) {
       const cellPx = w / map.grid;
       gridEl.style.backgroundImage = `
@@ -392,7 +378,6 @@
       gridEl.style.backgroundImage = 'none';
     }
 
-    // 2. Tokens
     const baseCellPx = map.grid > 0 ? w / map.grid : Math.max(36, w / 22);
     tokensEl.innerHTML = (map.tokens || []).map(tok => {
       const canMove = isMaster || tok.owner === me.id;
@@ -414,7 +399,6 @@
       `;
     }).join('');
 
-    // 3. Névoa de Guerra
     fogCanvas.width = w;
     fogCanvas.height = h;
     fogCanvas.classList.toggle('painting', isMaster && (tool === 'reveal' || tool === 'cover'));
@@ -498,7 +482,6 @@
     const fogCanvas = document.getElementById('vtt-fog-canvas');
     const brushEl = document.getElementById('vtt-brush');
 
-    // Ferramentas
     app.querySelectorAll('[data-tool]').forEach(btn => {
       btn.onclick = () => {
         tool = btn.dataset.tool;
@@ -511,7 +494,6 @@
       brushSel.onchange = () => { brushSize = Number(brushSel.value) || 6; };
     }
 
-    // Troca rápida de mapa
     const quickMap = document.getElementById('vtt-quick-map');
     if (quickMap) {
       quickMap.onchange = () => {
@@ -526,7 +508,6 @@
       };
     }
 
-    // Controles de Névoa
     const btnCoverAll = document.getElementById('vtt-fog-cover-all');
     if (btnCoverAll) {
       btnCoverAll.onclick = () => {
@@ -541,7 +522,6 @@
       };
     }
 
-    // Resetar turno (Jogador)
     const btnResetTurn = document.getElementById('vtt-reset-turn');
     if (btnResetTurn) {
       btnResetTurn.onclick = () => {
@@ -551,7 +531,6 @@
       };
     }
 
-    // Zoom & Câmera
     const applyCamera = () => {
       if (panLayer) panLayer.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`;
     };
@@ -562,7 +541,6 @@
     if (zOut) zOut.onclick = () => { zoom = Math.max(0.5, zoom - 0.2); applyCamera(); };
     if (zReset) zReset.onclick = () => { zoom = 1; pan = { x: 0, y: 0 }; applyCamera(); };
 
-    // Pôr / Tirar Jogador da Mesa (1 clique)
     app.querySelectorAll('[data-seat-player]').forEach(btn => {
       btn.onclick = () => {
         const playerId = btn.dataset.seatPlayer;
@@ -576,7 +554,6 @@
       };
     });
 
-    // Invocar NPC na Mesa
     const btnSpawnNpc = document.getElementById('vtt-spawn-npc-btn');
     if (btnSpawnNpc) {
       btnSpawnNpc.onclick = () => {
@@ -592,11 +569,9 @@
       };
     }
 
-    // Ir para aba Mapas & NPCs
     const btnGotoLib = document.getElementById('vtt-goto-lib');
     if (btnGotoLib) btnGotoLib.onclick = () => openVttTab('library');
 
-    // Remover Token individual
     app.querySelectorAll('[data-remove-tok]').forEach(btn => {
       btn.onclick = () => {
         vttApi('table', 'POST', { op: 'remove_token', id: btn.dataset.removeTok })
@@ -605,7 +580,6 @@
       };
     });
 
-    // Personalizar foto de um Token ativo na mesa
     app.querySelectorAll('[data-edit-tok-img]').forEach(btn => {
       btn.onclick = async () => {
         const id = btn.dataset.editTokImg;
@@ -620,7 +594,6 @@
       };
     });
 
-    // Limpar NPCs
     const btnClearNpcs = document.getElementById('vtt-clear-npcs');
     if (btnClearNpcs) {
       btnClearNpcs.onclick = () => {
@@ -632,7 +605,6 @@
       };
     }
 
-    // Arrastar Tokens
     if (tokensLayer) {
       tokensLayer.onpointerdown = e => {
         if (tool !== 'move') return;
@@ -658,7 +630,6 @@
       };
     }
 
-    // Pintar Névoa
     if (fogCanvas) {
       fogCanvas.onpointerdown = e => {
         if (!vttData.isMaster || (tool !== 'reveal' && tool !== 'cover')) return;
@@ -687,7 +658,6 @@
       };
     }
 
-    // Pan & Régua Livre no Viewport
     if (viewport) {
       viewport.onpointerdown = e => {
         if (draggingToken || isPainting) return;
@@ -738,9 +708,7 @@
         const y = parseFloat(draggingToken.style.top);
         const dist = calcMeters(dragOrigin, { x, y });
 
-        if (!vttData.isMaster) {
-          movedThisTurn += dist;
-        }
+        if (!vttData.isMaster) movedThisTurn += dist;
 
         const tokObj = vttData.map.tokens.find(t => t.id === id);
         if (tokObj) {
@@ -785,9 +753,6 @@
     updateLiveBoard();
   }
 
-  // =========================================================================
-  // ABA 2: BIBLIOTECA DE MAPAS & NPCS (ARMAZENAMENTO COM IMAGENS PERSONALIZÁVEIS)
-  // =========================================================================
   function renderLibraryView() {
     const app = document.getElementById('app');
     if (!app || !vttData || !vttData.isMaster) return;
@@ -799,7 +764,6 @@
 
     app.innerHTML = `
       <div class="vtt-lib-grid">
-        <!-- COLUNA 1: BIBLIOTECA DE MAPAS -->
         <section class="vtt-lib-panel">
           <h2>🗺️ Biblioteca de Mapas (${maps.length})</h2>
 
@@ -812,7 +776,7 @@
             <div>
               <label class="vtt-form-label">Imagem do Mapa (Upload ou Link URL)</label>
               <div class="vtt-img-picker-row">
-                <input class="vtt-field" id="lib-map-bg" value="${esc(editM.bg)}" placeholder="Cole URL ou clique em Enviar Imagem">
+                <input class="vtt-field" id="lib-map-bg" value="${esc(editM.bg)}" placeholder="Cole URL ou clique em Enviar">
                 <button type="button" class="vtt-btn gold" id="lib-map-upload" style="white-space:nowrap;">📁 Enviar</button>
               </div>
             </div>
@@ -829,7 +793,7 @@
             </div>
 
             <label style="display:flex; align-items:center; gap:8px; font-family:'Special Elite',monospace; font-size:0.8rem;">
-              <input type="checkbox" id="lib-map-fog" ${editM.fogOn ? 'checked' : ''}> Iniciar com Névoa de Guerra ativada
+              <input type="checkbox" id="lib-map-fog" style="width:auto;" ${editM.fogOn ? 'checked' : ''}> Iniciar com Névoa de Guerra ativada
             </label>
 
             <div style="display:flex; gap:8px;">
@@ -864,7 +828,6 @@
           </div>
         </section>
 
-        <!-- COLUNA 2: BIBLIOTECA DE NPCS & INIMIGOS -->
         <section class="vtt-lib-panel">
           <h2>👹 Biblioteca de NPCs &amp; Inimigos (${npcs.length})</h2>
 
@@ -882,7 +845,7 @@
                     <option value="2" ${Number(editN.size) === 2 ? 'selected' : ''}>2x2 (Grande)</option>
                     <option value="3" ${Number(editN.size) === 3 ? 'selected' : ''}>3x3 (Enorme)</option>
                   </select>
-                  <input type="color" id="lib-npc-color" value="${esc(editN.color || '#9e1b1b')}" style="width:42px; height:34px; border:1px solid #6b5033; background:none; cursor:pointer;">
+                  <input type="color" id="lib-npc-color" value="${esc(editN.color || '#9e1b1b')}" style="width:42px; height:34px; padding:0; border:1px solid #6b5033; background:none; cursor:pointer;">
                 </div>
               </div>
             </div>
@@ -890,7 +853,7 @@
             <div>
               <label class="vtt-form-label">Foto / Token do NPC (Upload ou Link URL)</label>
               <div class="vtt-img-picker-row">
-                <input class="vtt-field" id="lib-npc-avatar" value="${esc(editN.avatar)}" placeholder="Cole URL ou clique em Enviar Foto">
+                <input class="vtt-field" id="lib-npc-avatar" value="${esc(editN.avatar)}" placeholder="Cole URL ou clique em Enviar">
                 <button type="button" class="vtt-btn gold" id="lib-npc-upload" style="white-space:nowrap;">📁 Enviar</button>
               </div>
             </div>
@@ -946,7 +909,6 @@
   function bindLibraryEvents() {
     const app = document.getElementById('app');
 
-    // Upload de imagem do Mapa
     document.getElementById('lib-map-upload').onclick = async () => {
       const dataUrl = await pickAndCompressImage({ square: false, maxSize: 1400, quality: 0.78 });
       if (dataUrl) {
@@ -955,7 +917,6 @@
       }
     };
 
-    // Upload de imagem do NPC
     document.getElementById('lib-npc-upload').onclick = async () => {
       const dataUrl = await pickAndCompressImage({ square: true, maxSize: 200, quality: 0.82 });
       if (dataUrl) {
@@ -970,7 +931,6 @@
     const cancelNpc = document.getElementById('lib-npc-cancel');
     if (cancelNpc) cancelNpc.onclick = () => { editingNpcId = null; renderLibraryView(); };
 
-    // Salvar Mapa
     document.getElementById('vtt-form-map').onsubmit = e => {
       e.preventDefault();
       const maps = (vttData.library?.maps || []).slice();
@@ -996,7 +956,6 @@
         .catch(err => showToast(err.message));
     };
 
-    // Salvar NPC
     document.getElementById('vtt-form-npc').onsubmit = e => {
       e.preventDefault();
       const npcs = (vttData.library?.npcs || []).slice();
@@ -1025,7 +984,6 @@
         .catch(err => showToast(err.message));
     };
 
-    // Ações nos cards de Mapas
     app.querySelectorAll('[data-activate-map]').forEach(btn => {
       btn.onclick = () => {
         const m = (vttData.library?.maps || []).find(x => x.id === btn.dataset.activateMap);
@@ -1057,7 +1015,6 @@
       };
     });
 
-    // Ações nos cards de NPCs
     app.querySelectorAll('[data-spawn-lib-npc]').forEach(btn => {
       btn.onclick = () => {
         const npc = (vttData.library?.npcs || []).find(x => x.id === btn.dataset.spawnLibNpc);
@@ -1087,7 +1044,6 @@
     });
   }
 
-  // Observa o menu superior para manter as abas de Mesa e Mapas & NPCs sempre presentes
   const navEl = document.getElementById('nv');
   if (navEl) {
     const obs = new MutationObserver(() => injectVttNavButtons());
