@@ -55,7 +55,6 @@ export async function onRequest({ request, env, params }) {
   }
 
   try {
-    // --- AUTENTICAÇÃO ---
     if (action === 'me' && method === 'GET') {
       return json({
         role: isMaster ? 'master' : 'player',
@@ -64,7 +63,6 @@ export async function onRequest({ request, env, params }) {
       });
     }
 
-    // --- FICHAS ---
     if (action === 'sheets' && method === 'GET') {
       const targetPlayers = isMaster ? players : [currentPlayer];
       const enriched = await Promise.all(
@@ -99,7 +97,6 @@ export async function onRequest({ request, env, params }) {
       return json({ ok: true });
     }
 
-    // --- GERENCIAR JOGADORES ---
     if (action === 'players') {
       if (!isMaster) return json({ error: 'Apenas o mestre gerencia jogadores.' }, 403);
 
@@ -128,7 +125,6 @@ export async function onRequest({ request, env, params }) {
       }
     }
 
-    // --- VTT: ESTADO COMPLETO DA MESA + ELENCO + BIBLIOTECA ---
     if (action === 'vtt' && sub === 'state' && method === 'GET') {
       const [mapRaw, libRaw, roster] = await Promise.all([
         getKV('map_state', defaultMapState()),
@@ -151,7 +147,6 @@ export async function onRequest({ request, env, params }) {
       ]);
 
       const map = { ...defaultMapState(), ...mapRaw };
-      // Sincroniza avatar/nome/HP atualizados da ficha nos tokens de jogadores que não têm foto forçada
       map.tokens = (map.tokens || []).map(tok => {
         if (tok.kind !== 'player') return tok;
         const pInfo = roster.find(r => r.id === tok.owner);
@@ -179,7 +174,6 @@ export async function onRequest({ request, env, params }) {
       });
     }
 
-    // --- VTT: SALVAR BIBLIOTECA DE MAPAS E NPCS ---
     if (action === 'vtt' && sub === 'library' && method === 'POST') {
       if (!isMaster) return json({ error: 'Apenas o mestre edita a biblioteca.' }, 403);
       const body = await request.json();
@@ -190,7 +184,6 @@ export async function onRequest({ request, env, params }) {
       return json({ ok: true, library: current });
     }
 
-    // --- VTT: AÇÕES DA MESA (ATIVAR MAPA, PÔR/TIRAR PLAYERS, INVOCAR NPCS) ---
     if (action === 'vtt' && sub === 'table' && method === 'POST') {
       if (!isMaster) return json({ error: 'Apenas o mestre controla a mesa.' }, 403);
       const body = await request.json();
@@ -210,14 +203,6 @@ export async function onRequest({ request, env, params }) {
         if (!body.keepTokens) {
           map.tokens = (map.tokens || []).filter(t => t.kind === 'player');
         }
-      }
-
-      if (body.op === 'update_map') {
-        if (body.name !== undefined) map.name = String(body.name);
-        if (body.bg !== undefined) map.bg = String(body.bg);
-        if (body.grid !== undefined) map.grid = Math.max(0, Math.min(80, Number(body.grid) || 0));
-        if (body.cellMeters !== undefined) map.cellMeters = Math.max(0.5, Number(body.cellMeters) || 1.5);
-        if (body.fogOn !== undefined) map.fog = { ...(map.fog || { ops: [] }), on: Boolean(body.fogOn) };
       }
 
       if (body.op === 'put_player') {
@@ -299,7 +284,6 @@ export async function onRequest({ request, env, params }) {
       return json({ ok: true, map });
     }
 
-    // --- VTT: MOVER TOKEN ---
     if (action === 'vtt' && sub === 'move' && method === 'POST') {
       const body = await request.json();
       const map = { ...defaultMapState(), ...(await getKV('map_state', defaultMapState())) };
@@ -314,7 +298,6 @@ export async function onRequest({ request, env, params }) {
       return json({ ok: true });
     }
 
-    // --- VTT: NÉVOA DE GUERRA (EM LOTE) ---
     if (action === 'vtt' && sub === 'fog' && method === 'POST') {
       if (!isMaster) return json({ error: 'Apenas o mestre controla a névoa.' }, 403);
       const body = await request.json();
