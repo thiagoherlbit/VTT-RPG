@@ -49,6 +49,7 @@
     heart: '<path d="M12 21s-8-5.5-8-11a4.5 4.5 0 0 1 8-2.5A4.5 4.5 0 0 1 20 10c0 5.5-8 11-8 11z"/>',
     flame: '<path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4-1-6 1-10z"/>',
     eye: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle class="pu" cx="12" cy="12" r="2.8"/>',
+    boot: '<path d="M8 3h6v7l5 3v6H5V5z"/><path d="M5 15h8"/>',
     sig: '<circle cx="12" cy="12" r="9.5"/><path d="M12 3l5.3 16.3L3.4 9.2h17.2L6.7 19.3z"/>'
   };
 
@@ -250,6 +251,15 @@
       (hp ? '<div class="xr"><label>Vida extra <input type="number" min="0" data-set="hp.x" value="' + (v.x || 0) + '"></label></div><div class="bar b2"><i></i></div>' : '') +
       '<div class="ctl"><input type="number" min="1" value="1" data-amt="' + k + '" aria-label="Valor"><button class="bt" data-act="dmg" data-k="' + k + '">' + b[0] + '</button><button class="bt" data-act="heal" data-k="' + k + '">' + b[1] + '</button>' + (hp ? '<button class="bt" data-act="xtra">+ Extra</button>' : '') + '</div>' +
       (v.m > 0 ? '' : '<p class="hint mu">Defina o máximo primeiro.</p>') +
+      '</section>';
+  }
+
+  function moveCard(delay) {
+    var speed = S.speed == null ? 9 : S.speed;
+    return '<section class="pn rise" data-v="mv"' + delay + '>' +
+      '<h2>' + I(P.boot, 'sw') + 'Movimento</h2>' +
+      '<div class="nums"><input type="number" min="0" step="0.5" data-set="speed" value="' + speed + '" aria-label="Movimento por turno em metros"><span>m</span></div>' +
+      '<p class="hint mu">Quantos metros este personagem anda por turno em combate.</p>' +
       '</section>';
   }
 
@@ -514,7 +524,6 @@
           (lockedForPlayer ? '' : '<button class="bt x" data-act="delAt" data-i="' + i + '" aria-label="Remover atributo">×</button>') +
           '</div>';
       }).join('') +
-      '<div class="at"><input class="an" value="Movimento (m)" disabled aria-label="Movimento por turno em metros"><span></span><input class="vl" type="number" min="0" step="0.5" data-set="speed" value="' + (S.speed == null ? 9 : S.speed) + '" aria-label="Movimento em metros"></div>' +
       '<p class="hint mu">O número ao lado de cada atributo é a vantagem (+) ou a desvantagem (−) que ele dá.</p>' +
       (lockedForPlayer ? '' : '<p><button class="bt" data-act="addAt">Novo atributo</button></p>') +
       '</section>' +
@@ -538,7 +547,7 @@
       '<span>Sincronizado automaticamente com o servidor.</span>' +
       '</footer>';
 
-    app.innerHTML = '<div class="col">' + hero + ban + '<div class="vts">' + vital('hp', d()) + vital('st', d()) + '</div>' + inv + sk + '</div>' + side + ft;
+    app.innerHTML = '<div class="col">' + hero + ban + '<div class="vts">' + vital('hp', d()) + vital('st', d()) + moveCard(d()) + '</div>' + inv + sk + '</div>' + side + ft;
 
     setTimeout(function () {
       paint('hp');

@@ -305,9 +305,11 @@
 
     tokensEl.innerHTML = (V.map.tokens || []).map(function (tok) {
       var canMove = V.isMaster || tok.owner === V.me.id;
+      var moveRule = window.Play && canMove ? window.Play.moveRule(tok.id, V.isMaster) : null;
+      var locked = moveRule && !moveRule.allowed;
       var szFactor = Math.max(1, Number(tok.size) || 1);
       var pxSize = cellPx > 0 ? Math.max(28, cellPx * szFactor * 0.88) : Math.max(32, w * 0.042 * szFactor);
-      return '<div class="vtt-token' + (canMove ? ' movable' : '') + (window.Play && window.Play.currentTokenId() === tok.id ? ' active-turn' : '') + '" data-tok-id="' + esc(tok.id) + '" style="left:' + tok.x + '%; top:' + tok.y + '%; width:' + pxSize + 'px; height:' + pxSize + 'px; --ring:' + esc(tok.color || '#d8b45a') + ';">' +
+      return '<div class="vtt-token' + (canMove ? ' movable' : '') + (locked ? ' locked' : '') + (window.Play && window.Play.currentTokenId() === tok.id ? ' active-turn' : '') + '" data-tok-id="' + esc(tok.id) + '" style="left:' + tok.x + '%; top:' + tok.y + '%; width:' + pxSize + 'px; height:' + pxSize + 'px; --ring:' + esc(tok.color || '#d8b45a') + ';">' +
         (tok.kind === 'npc' && (V.isMaster || tok.hp !== undefined) ? '<span class="vtt-token-hp">' + (tok.hp ?? 0) + '/' + (tok.mhp ?? 0) + '</span>' : '') +
         (tok.avatar ? '<img src="' + esc(tok.avatar) + '" alt="">' : '<span>' + esc((tok.name || '?').slice(0, 2).toUpperCase()) + '</span>') +
         '<span class="vtt-token-label">' + esc(tok.name) + '</span>' +
@@ -419,7 +421,7 @@
 
       var rule = window.Play ? window.Play.moveRule(tokData.id, V.isMaster) : null;
       if (rule && !rule.allowed) {
-        toast('Não é o turno deste personagem.');
+        toast(rule.reason);
         return;
       }
       draggingTok = { el: tokEl, data: tokData, limit: rule ? rule.remaining : null };
