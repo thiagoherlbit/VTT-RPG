@@ -395,21 +395,16 @@ export async function onRequest({ request, env, params }) {
       }
       if (!isMaster) {
         const combat = await getKV('combat', defaultCombat());
-        if (combat.phase === 'running') {
-          const current = combat.order[combat.turn];
-          const entry = combat.order.find((item) => item.tokenId === tok.id);
-          if (entry) {
-            if (!current || current.tokenId !== tok.id) {
-              return json({ error: 'Não é o turno deste personagem.' }, 403);
-            }
-            const meters = Math.max(0, Number(body.meters) || 0);
-            if (current.moved + meters > current.limit + 0.05) {
-              return json({ error: 'Movimento do turno esgotado.' }, 400);
-            }
-            current.moved = Math.round((current.moved + meters) * 100) / 100;
-            await putKV('combat', combat);
-          }
+        const current = combat.phase === 'running' ? combat.order[combat.turn] : null;
+        if (!current || current.tokenId !== tok.id) {
+          return json({ error: 'Você só pode se mover durante o combate, no seu turno.' }, 403);
         }
+        const meters = Math.max(0, Number(body.meters) || 0);
+        if (current.moved + meters > current.limit + 0.05) {
+          return json({ error: 'Movimento do turno esgotado.' }, 400);
+        }
+        current.moved = Math.round((current.moved + meters) * 100) / 100;
+        await putKV('combat', combat);
       }
       tok.x = Math.max(1, Math.min(99, Number(body.x) || 50));
       tok.y = Math.max(1, Math.min(99, Number(body.y) || 50));
