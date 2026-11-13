@@ -20,8 +20,7 @@
     tool: 'move', // 'move' | 'ruler' | 'reveal' | 'cover'
     brush: 6,     // 3 (P) | 6 (M) | 12 (G)
     zoom: 1,
-    usedMove: 0,
-    maxMove: 9,
+    dragging: false,
     editMapId: '',
     editNpcId: '',
     draftMapImg: '',
@@ -110,7 +109,7 @@
   function startPolling() {
     stopPolling();
     pollTimer = setInterval(function () {
-      if (mode === 'table' && Date.now() > lockRefreshUntil) {
+      if (mode === 'table' && !V.dragging && Date.now() > lockRefreshUntil) {
         fetchVttState(true);
       }
     }, 3500);
@@ -127,11 +126,6 @@
           maps: Array.isArray(res.library.maps) ? res.library.maps : [],
           npcs: Array.isArray(res.library.npcs) ? res.library.npcs : []
         };
-      }
-      var myRoster = V.roster.find(function (r) { return r.id === V.me.id; });
-      if (myRoster && myRoster.speed) {
-        var parsed = parseFloat(String(myRoster.speed).replace(',', '.'));
-        if (!isNaN(parsed) && parsed > 0) V.maxMove = parsed;
       }
 
       if (mode === 'table') {
@@ -162,8 +156,6 @@
     var mapsList = V.library.maps || [];
     var npcsList = V.library.npcs || [];
     var activePlayersCount = (m.tokens || []).filter(function (t) { return t.kind === 'player'; }).length;
-    var remMove = Math.max(0, V.maxMove - V.usedMove);
-    var movePct = V.maxMove > 0 ? Math.min(100, (remMove / V.maxMove) * 100) : 100;
 
     app.innerHTML =
       '<div class="vtt-layout">' +
@@ -214,15 +206,6 @@
       '</div>' +
 
       '<aside class="vtt-side">' +
-      (!V.isMaster
-        ? '<section class="pn">' +
-          '<h2>Deslocamento do Turno</h2>' +
-          '<div class="vtt-move-bar"><i style="width:' + movePct + '%"></i></div>' +
-          '<p class="mu" style="font-family:var(--tp); font-size:.85rem; margin:0 0 8px;">Restante: ' + remMove.toFixed(1).replace('.', ',') + 'm / ' + V.maxMove.toFixed(1).replace('.', ',') + 'm</p>' +
-          '<button class="bt" style="width:100%;" data-vtt-act="reset-move">Novo Turno (Resetar)</button>' +
-          '</section>'
-        : '') +
-
       '<section class="pn">' +
       '<h2>⚔️ Jogadores na Mesa <small>' + activePlayersCount + '/' + V.roster.length + '</small></h2>' +
       (V.roster.length
@@ -324,7 +307,7 @@
       var canMove = V.isMaster || tok.owner === V.me.id;
       var szFactor = Math.max(1, Number(tok.size) || 1);
       var pxSize = cellPx > 0 ? Math.max(28, cellPx * szFactor * 0.88) : Math.max(32, w * 0.042 * szFactor);
-      return '<div class="vtt-token' + (canMove ? ' movable' : '') + '" data-tok-id="' + esc(tok.id) + '" style="left:' + tok.x + '%; top:' + tok.y + '%; width:' + pxSize + 'px; height:' + pxSize + 'px; --ring:' + esc(tok.color || '#d8b45a') + ';">' +
+      return '<div class="vtt-token' + (canMove ? ' movable' : '') + (window.Play && window.Play.currentTokenId() === tok.id ? ' active-turn' : '') + '" data-tok-id="' + esc(tok.id) + '" style="left:' + tok.x + '%; top:' + tok.y + '%; width:' + pxSize + 'px; height:' + pxSize + 'px; --ring:' + esc(tok.color || '#d8b45a') + ';">' +
         (tok.kind === 'npc' && (V.isMaster || tok.hp !== undefined) ? '<span class="vtt-token-hp">' + (tok.hp ?? 0) + '/' + (tok.mhp ?? 0) + '</span>' : '') +
         (tok.avatar ? '<img src="' + esc(tok.avatar) + '" alt="">' : '<span>' + esc((tok.name || '?').slice(0, 2).toUpperCase()) + '</span>') +
         '<span class="vtt-token-label">' + esc(tok.name) + '</span>' +
@@ -434,7 +417,13 @@
       var tokData = (V.map.tokens || []).find(function (t) { return t.id === tokEl.dataset.tokId; });
       if (!tokData) return;
 
-      draggingTok = { el: tokEl, data: tokData };
+      var rule = window.Play ? window.Play.moveRule(tokData.id, V.isMaster) : null;
+      if (rule && !rule.allowed) {
+        toast('Não é o turno deste personagem.');
+        return;
+      }
+      draggingTok = { el: tokEl, data: tokData, limit: rule ? rule.remaining : null };
+      V.dragging = true;
       originPct = { x: tokData.x, y: tokData.y };
       stage.setPointerCapture(e.pointerId);
     };
@@ -464,7 +453,7 @@
 
       if (!draggingTok) return;
       var target = toPct(e.clientX, e.clientY);
-      var limit = V.isMaster ? null : Math.max(0, V.maxMove - V.usedMove);
+      var limit = draggingTok.limit;
       if (limit !== null) {
         var d = distMeters(originPct, target);
         if (d > limit && d > 0) {
@@ -500,17 +489,30 @@
       var nx = parseFloat(draggingTok.el.style.left);
       var ny = parseFloat(draggingTok.el.style.top);
       var moved = distMeters(originPct, { x: nx, y: ny });
-      if (!V.isMaster) {
-        V.usedMove += moved;
-      }
       draggingTok.data.x = nx;
       draggingTok.data.y = ny;
       var id = draggingTok.data.id;
       draggingTok = null;
       clearRuler();
+      V.dragging = false;
       lockRefreshUntil = Date.now() + 2500;
-      if (!V.isMaster) renderTable();
-      api('vtt/move', 'POST', { id: id, x: nx, y: ny }).catch(function (err) { toast(err.message); });
+      api('vtt/move', 'POST', { id: id, x: nx, y: ny, meters: Number(moved.toFixed(2)) }).then(function () {
+        if (window.Play) window.Play.refresh();
+      }).catch(function (err) {
+        toast(err.message);
+        lockRefreshUntil = 0;
+        fetchVttState(true);
+      });
+    };
+
+    stage.onpointercancel = function () {
+      draggingTok = null;
+      rulerStart = null;
+      painting = false;
+      pendingOps = [];
+      V.dragging = false;
+      clearRuler();
+      updateStageOnly();
     };
 
     function paintAt(e) {
@@ -807,10 +809,6 @@
     } else if (act === 'zoom-out') {
       V.zoom = Math.max(0.5, +(V.zoom - 0.15).toFixed(2));
       renderTable();
-    } else if (act === 'reset-move') {
-      V.usedMove = 0;
-      renderTable();
-      toast('Deslocamento restaurado!');
     } else if (act === 'fog-cover-all') {
       api('vtt/fog', 'POST', { op: 'cover_all' }).then(function () { fetchVttState(false); });
     } else if (act === 'fog-reveal-all') {
@@ -877,5 +875,8 @@
         renderLibrary();
       });
     }
+  });
+  document.addEventListener('play:update', function () {
+    if (mode === 'table' && !V.dragging && document.getElementById('vtt-stage')) updateStageOnly();
   });
 })();

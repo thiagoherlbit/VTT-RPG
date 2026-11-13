@@ -9,6 +9,7 @@
     notes: '',
     mnotes: '',
     lock: false,
+    speed: 9,
     attrs: [
       ['Força', 0],
       ['Destreza', 0],
@@ -81,7 +82,7 @@
 
   function modH(i, v) {
     var m = mod(v);
-    return '<small class="mod ' + (m > 0 ? 'pos' : m < 0 ? 'neg' : '') + '" data-mod="' + i + '" title="Vantagem ou desvantagem do atributo">' + sg(m) + '</small>';
+    return '<small class="mod ' + (m > 0 ? 'pos' : m < 0 ? 'neg' : '') + '" data-mod="' + i + '" data-act="roll-attr" data-i="' + i + '" title="Clique para rolar 1d20 com este bônus">' + sg(m) + '</small>';
   }
 
   function cl(o) { return JSON.parse(JSON.stringify(o)); }
@@ -121,7 +122,7 @@
   }
 
   function imgOr(s, ic, a, c) {
-    return s ? '<img src="' + s + '" alt="' + esc(a) + '">' : I(P[ic], c);
+    return s ? '<img src="' + esc(s) + '" alt="' + esc(a) + '">' : I(P[ic], c);
   }
 
   function api(path, method, body) {
@@ -432,7 +433,7 @@
 
     var n = 0;
     var d = function () { return ' style="--d:' + (0.05 + n++ * 0.06).toFixed(2) + 's"'; };
-    document.getElementById('bgi').style.backgroundImage = S.bg ? 'url("' + S.bg + '")' : '';
+    document.getElementById('bgi').style.backgroundImage = S.bg ? 'url("' + String(S.bg).replace(/"/g, '%22') + '")' : '';
 
     var hero =
       '<header class="pn hd rise"' + d() + '>' +
@@ -449,7 +450,7 @@
 
     var ban =
       '<section class="pn bn rise"' + d() + ' data-act="img" data-p="banner" role="button" tabindex="0" aria-label="Trocar banner">' +
-      (S.banner ? '<img src="' + S.banner + '" alt="">' : '<div class="ph"><div>Clique para adicionar um banner<br><small>png, jpg ou gif</small></div></div>') +
+      (S.banner ? '<img src="' + esc(S.banner) + '" alt="">' : '<div class="ph"><div>Clique para adicionar um banner<br><small>png, jpg ou gif</small></div></div>') +
       '<span class="ov">Trocar banner</span>' +
       '</section>';
 
@@ -486,6 +487,7 @@
             '</div>' +
             '<div class="sr">' +
             '<label class="cs">Custo <input type="number" min="0" data-set="skills.' + i + '.c" value="' + (s.c || 0) + '" aria-label="Custo"></label>' +
+            '<button class="bt x" data-act="roll-dm" data-i="' + i + '" title="Rolar dano">🎲</button>' +
             '<button class="bt" data-act="use" data-i="' + i + '">Usar</button>' +
             '<button class="bt x" data-act="delSk" data-i="' + i + '" aria-label="Remover habilidade">×</button>' +
             '</div>' +
@@ -512,6 +514,7 @@
           (lockedForPlayer ? '' : '<button class="bt x" data-act="delAt" data-i="' + i + '" aria-label="Remover atributo">×</button>') +
           '</div>';
       }).join('') +
+      '<div class="at"><input class="an" value="Movimento (m)" disabled aria-label="Movimento por turno em metros"><span></span><input class="vl" type="number" min="0" step="0.5" data-set="speed" value="' + (S.speed == null ? 9 : S.speed) + '" aria-label="Movimento em metros"></div>' +
       '<p class="hint mu">O número ao lado de cada atributo é a vantagem (+) ou a desvantagem (−) que ele dá.</p>' +
       (lockedForPlayer ? '' : '<p><button class="bt" data-act="addAt">Novo atributo</button></p>') +
       '</section>' +
@@ -570,7 +573,7 @@
       '<input data-set="' + p + '.dt" value="' + esc(s.dt) + '" placeholder="Tipo, alcance ou efeito do dano" aria-label="Tipo de dano">' +
       '</div>' +
       '<textarea rows="4" data-set="' + p + '.d" placeholder="Descrição" aria-label="Descrição">' + esc(s.d) + '</textarea>' +
-      '<div class="ctl">' + (s.img ? '<button class="bt" data-act="rmImg">Remover imagem</button>' : '') + '<button class="bt" data-act="delItem">Excluir item</button></div>' +
+      '<div class="ctl">' + (s.dm ? '<button class="bt" data-act="roll-item">🎲 Rolar dano</button>' : '') + (s.img ? '<button class="bt" data-act="rmImg">Remover imagem</button>' : '') + '<button class="bt" data-act="delItem">Excluir item</button></div>' +
       '</div>';
     requestAnimationFrame(function () { md.classList.add('on'); });
   }
@@ -628,6 +631,17 @@
       }
       optimizeAndApplyImage(f, p);
     });
+  }
+
+  function rollDamage(expression, label) {
+    var text = String(expression || '').replace(/\s+/g, '');
+    if (!/^\d{0,2}d\d{1,3}([+-]\d{1,3})?$/i.test(text)) {
+      toast('Dano inválido. Use algo como 1d8+2.');
+      return;
+    }
+    if (window.Play) {
+      window.Play.roll({ expr: text, label: (S.name || 'Personagem') + ' · ' + (label || 'Dano') });
+    }
   }
 
   document.addEventListener('input', function (e) {
@@ -797,6 +811,18 @@
         S.st.c -= n;
         sync('st');
         toast('Usou ' + (v.n || 'habilidade') + (n ? ' (−' + n + ')' : ''));
+        break;
+      case 'roll-attr':
+        n = mod(S.attrs[i][1]);
+        if (window.Play) {
+          window.Play.roll({ expr: '1d20' + (n ? sg(n) : ''), label: (S.name || 'Personagem') + ' · ' + (S.attrs[i][0] || 'Atributo') });
+        }
+        break;
+      case 'roll-dm':
+        rollDamage(S.skills[i].dm, S.skills[i].n);
+        break;
+      case 'roll-item':
+        rollDamage(S.items[oi].dm, S.items[oi].n);
         break;
       case 'rmBg':
         S.bg = '';
